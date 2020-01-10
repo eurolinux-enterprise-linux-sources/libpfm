@@ -25,6 +25,7 @@
 #ifndef __PFMLIB_PRIV_H__
 #define __PFMLIB_PRIV_H__
 #include <perfmon/pfmlib.h>
+#include <string.h>
 
 #define PFM_PLM_ALL (PFM_PLM0|PFM_PLM1|PFM_PLM2|PFM_PLM3|PFM_PLMH)
 
@@ -34,6 +35,7 @@
 
 #define PFM_ATTR_I(y, d) { .name = (y), .type = PFM_ATTR_MOD_INTEGER, .desc = (d) }
 #define PFM_ATTR_B(y, d) { .name = (y), .type = PFM_ATTR_MOD_BOOL, .desc = (d) }
+#define PFM_ATTR_SKIP	 { .name = "" } /* entry not populated (skipped) */
 #define PFM_ATTR_NULL	{ .name = NULL }
 
 #define PFMLIB_EVT_MAX_NAME_LEN	256
@@ -114,6 +116,9 @@ typedef struct pfmlib_pmu {
 
 	const pfmlib_attr_desc_t *atdesc;	/* pointer to attrs table */
 
+	const int	cpu_family;		/* cpu family number for detection */
+	const int	*cpu_models;		/* cpu model numbers for detection (zero terminated) */
+
 	int 		 (*pmu_detect)(void *this);
 	int 		 (*pmu_init)(void *this);	/* optional */
 	void		 (*pmu_terminate)(void *this); /* optional */
@@ -128,9 +133,14 @@ typedef struct pfmlib_pmu {
 	int		 (*get_event_encoding[PFM_OS_MAX])(void *this, pfmlib_event_desc_t *e);
 
 	void		 (*validate_pattrs[PFM_OS_MAX])(void *this, pfmlib_event_desc_t *e);
+	int		 (*os_detect[PFM_OS_MAX])(void *this);
 	int		 (*validate_table)(void *this, FILE *fp);
-	int 		 (*get_num_events)(void *this);	/* optional */
-	void		 (*display_reg)(void *this, pfmlib_event_desc_t *e, void *val); /* optional */
+	/*
+	 * optional callbacks
+	 */
+	int 		 (*get_num_events)(void *this);
+	void		 (*display_reg)(void *this, pfmlib_event_desc_t *e, void *val);
+	int 		 (*match_event)(void *this, pfmlib_event_desc_t *d, const char *e, const char *s);
 } pfmlib_pmu_t;
 
 typedef struct {
@@ -153,17 +163,20 @@ typedef struct {
 #define PFMLIB_PMU_FL_ACTIVE	0x2	/* PMU is initialized + detected on host */
 #define PFMLIB_PMU_FL_RAW_UMASK	0x4	/* PMU supports PFM_ATTR_RAW_UMASKS */
 #define PFMLIB_PMU_FL_ARCH_DFL	0x8	/* PMU is arch default */
+#define PFMLIB_PMU_FL_NO_SMPL	0x10	/* PMU does not support sampling */
 
 typedef struct {
 	int	initdone;
+	int	initret; /* initial return value from pfm_initialize() */
 	int	verbose;
 	int	debug;
 	int	inactive;
 	char	*forced_pmu;
+	char	*blacklist_pmus;
 	FILE 	*fp;	/* verbose and debug file descriptor, default stderr or PFMLIB_DEBUG_STDOUT */
 } pfmlib_config_t;	
 
-#define PFMLIB_INITIALIZED()	(pfm_cfg.initdone)
+#define PFMLIB_INITIALIZED()	(pfm_cfg.initdone && pfm_cfg.initret == PFM_SUCCESS)
 
 extern pfmlib_config_t pfm_cfg;
 
@@ -209,6 +222,7 @@ extern pfmlib_pmu_t amd64_fam11h_turion_support;
 extern pfmlib_pmu_t amd64_fam12h_llano_support;
 extern pfmlib_pmu_t amd64_fam14h_bobcat_support;
 extern pfmlib_pmu_t amd64_fam15h_interlagos_support;
+extern pfmlib_pmu_t amd64_fam15h_nb_support;
 extern pfmlib_pmu_t intel_p6_support;
 extern pfmlib_pmu_t intel_ppro_support;
 extern pfmlib_pmu_t intel_pii_support;
@@ -236,6 +250,10 @@ extern pfmlib_pmu_t intel_ivb_unc_cbo2_support;
 extern pfmlib_pmu_t intel_ivb_unc_cbo3_support;
 extern pfmlib_pmu_t intel_ivb_ep_support;
 extern pfmlib_pmu_t intel_hsw_support;
+extern pfmlib_pmu_t intel_hsw_ep_support;
+extern pfmlib_pmu_t intel_bdw_support;
+extern pfmlib_pmu_t intel_skl_support;
+extern pfmlib_pmu_t intel_rapl_support;
 extern pfmlib_pmu_t intel_snbep_unc_cb0_support;
 extern pfmlib_pmu_t intel_snbep_unc_cb1_support;
 extern pfmlib_pmu_t intel_snbep_unc_cb2_support;
@@ -256,7 +274,84 @@ extern pfmlib_pmu_t intel_snbep_unc_ubo_support;
 extern pfmlib_pmu_t intel_snbep_unc_r2pcie_support;
 extern pfmlib_pmu_t intel_snbep_unc_r3qpi0_support;
 extern pfmlib_pmu_t intel_snbep_unc_r3qpi1_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb0_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb1_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb2_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb3_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb4_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb5_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb6_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb7_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb8_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb9_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb10_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb11_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb12_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb13_support;
+extern pfmlib_pmu_t intel_ivbep_unc_cb14_support;
+extern pfmlib_pmu_t intel_ivbep_unc_ha0_support;
+extern pfmlib_pmu_t intel_ivbep_unc_ha1_support;
+extern pfmlib_pmu_t intel_ivbep_unc_imc0_support;
+extern pfmlib_pmu_t intel_ivbep_unc_imc1_support;
+extern pfmlib_pmu_t intel_ivbep_unc_imc2_support;
+extern pfmlib_pmu_t intel_ivbep_unc_imc3_support;
+extern pfmlib_pmu_t intel_ivbep_unc_imc4_support;
+extern pfmlib_pmu_t intel_ivbep_unc_imc5_support;
+extern pfmlib_pmu_t intel_ivbep_unc_imc6_support;
+extern pfmlib_pmu_t intel_ivbep_unc_imc7_support;
+extern pfmlib_pmu_t intel_ivbep_unc_pcu_support;
+extern pfmlib_pmu_t intel_ivbep_unc_qpi0_support;
+extern pfmlib_pmu_t intel_ivbep_unc_qpi1_support;
+extern pfmlib_pmu_t intel_ivbep_unc_qpi2_support;
+extern pfmlib_pmu_t intel_ivbep_unc_ubo_support;
+extern pfmlib_pmu_t intel_ivbep_unc_r2pcie_support;
+extern pfmlib_pmu_t intel_ivbep_unc_r3qpi0_support;
+extern pfmlib_pmu_t intel_ivbep_unc_r3qpi1_support;
+extern pfmlib_pmu_t intel_ivbep_unc_r3qpi2_support;
+extern pfmlib_pmu_t intel_ivbep_unc_irp_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb0_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb1_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb2_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb3_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb4_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb5_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb6_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb7_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb8_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb9_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb10_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb11_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb12_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb13_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb14_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb15_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb16_support;
+extern pfmlib_pmu_t intel_hswep_unc_cb17_support;
+extern pfmlib_pmu_t intel_hswep_unc_ha0_support;
+extern pfmlib_pmu_t intel_hswep_unc_ha1_support;
+extern pfmlib_pmu_t intel_hswep_unc_imc0_support;
+extern pfmlib_pmu_t intel_hswep_unc_imc1_support;
+extern pfmlib_pmu_t intel_hswep_unc_imc2_support;
+extern pfmlib_pmu_t intel_hswep_unc_imc3_support;
+extern pfmlib_pmu_t intel_hswep_unc_imc4_support;
+extern pfmlib_pmu_t intel_hswep_unc_imc5_support;
+extern pfmlib_pmu_t intel_hswep_unc_imc6_support;
+extern pfmlib_pmu_t intel_hswep_unc_imc7_support;
+extern pfmlib_pmu_t intel_hswep_unc_pcu_support;
+extern pfmlib_pmu_t intel_hswep_unc_qpi0_support;
+extern pfmlib_pmu_t intel_hswep_unc_qpi1_support;
+extern pfmlib_pmu_t intel_hswep_unc_sb0_support;
+extern pfmlib_pmu_t intel_hswep_unc_sb1_support;
+extern pfmlib_pmu_t intel_hswep_unc_sb2_support;
+extern pfmlib_pmu_t intel_hswep_unc_sb3_support;
+extern pfmlib_pmu_t intel_hswep_unc_ubo_support;
+extern pfmlib_pmu_t intel_hswep_unc_r2pcie_support;
+extern pfmlib_pmu_t intel_hswep_unc_r3qpi0_support;
+extern pfmlib_pmu_t intel_hswep_unc_r3qpi1_support;
+extern pfmlib_pmu_t intel_hswep_unc_r3qpi2_support;
+extern pfmlib_pmu_t intel_hswep_unc_irp_support;
 extern pfmlib_pmu_t intel_knc_support;
+extern pfmlib_pmu_t intel_slm_support;
 extern pfmlib_pmu_t power4_support;
 extern pfmlib_pmu_t ppc970_support;
 extern pfmlib_pmu_t ppc970mp_support;
@@ -264,7 +359,10 @@ extern pfmlib_pmu_t power5_support;
 extern pfmlib_pmu_t power5p_support;
 extern pfmlib_pmu_t power6_support;
 extern pfmlib_pmu_t power7_support;
+extern pfmlib_pmu_t power8_support;
 extern pfmlib_pmu_t torrent_support;
+extern pfmlib_pmu_t powerpc_nest_mcs_read_support;
+extern pfmlib_pmu_t powerpc_nest_mcs_write_support;
 extern pfmlib_pmu_t sparc_support;
 extern pfmlib_pmu_t sparc_ultra12_support;
 extern pfmlib_pmu_t sparc_ultra3_support;
@@ -275,16 +373,24 @@ extern pfmlib_pmu_t sparc_niagara1_support;
 extern pfmlib_pmu_t sparc_niagara2_support;
 extern pfmlib_pmu_t cell_support;
 extern pfmlib_pmu_t perf_event_support;
+extern pfmlib_pmu_t perf_event_raw_support;
 extern pfmlib_pmu_t intel_wsm_sp_support;
 extern pfmlib_pmu_t intel_wsm_dp_support;
 extern pfmlib_pmu_t intel_wsm_unc_support;
+extern pfmlib_pmu_t arm_cortex_a7_support;
 extern pfmlib_pmu_t arm_cortex_a8_support;
 extern pfmlib_pmu_t arm_cortex_a9_support;
 extern pfmlib_pmu_t arm_cortex_a15_support;
 extern pfmlib_pmu_t arm_1176_support;
+extern pfmlib_pmu_t arm_qcom_krait_support;
+extern pfmlib_pmu_t arm_cortex_a57_support;
+extern pfmlib_pmu_t arm_cortex_a53_support;
+extern pfmlib_pmu_t arm_xgene_support;
 extern pfmlib_pmu_t mips_74k_support;
 extern pfmlib_pmu_t s390x_cpum_cf_support;
+extern pfmlib_pmu_t s390x_cpum_sf_support;
 
+extern pfmlib_os_t *pfmlib_os;
 extern pfmlib_os_t pfmlib_os_perf;
 extern pfmlib_os_t pfmlib_os_perf_ext;
 
@@ -351,6 +457,10 @@ pfmlib_pidx2idx(pfmlib_pmu_t *pmu, int pidx)
 #define PFMLIB_ENCODE_PERF(f)  \
 	.get_event_encoding[PFM_OS_PERF_EVENT] = f, \
 	.get_event_encoding[PFM_OS_PERF_EVENT_EXT] = f
+
+#define PFMLIB_OS_DETECT(f)  \
+	.os_detect[PFM_OS_PERF_EVENT] = f, \
+	.os_detect[PFM_OS_PERF_EVENT_EXT] = f
 #else
 #define PFMLIB_VALID_PERF_PATTRS(f) \
 	.validate_pattrs[PFM_OS_PERF_EVENT] = NULL, \
@@ -359,6 +469,16 @@ pfmlib_pidx2idx(pfmlib_pmu_t *pmu, int pidx)
 #define PFMLIB_ENCODE_PERF(f)  \
 	.get_event_encoding[PFM_OS_PERF_EVENT] = NULL, \
 	.get_event_encoding[PFM_OS_PERF_EVENT_EXT] = NULL
+
+#define PFMLIB_OS_DETECT(f)  \
+	.os_detect[PFM_OS_PERF_EVENT] = NULL, \
+	.os_detect[PFM_OS_PERF_EVENT_EXT] = NULL
 #endif
+
+static inline int
+is_empty_attr(const pfmlib_attr_desc_t *a)
+{
+	return !a || !a->name || strlen(a->name) == 0 ? 1 : 0;
+}
 
 #endif /* __PFMLIB_PRIV_H__ */

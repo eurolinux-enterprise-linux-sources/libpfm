@@ -18,16 +18,16 @@
 *
 */
 typedef struct {
-   char *pme_name;
-   unsigned pme_code;
-   char *pme_short_desc;
-   char *pme_long_desc;
+   uint64_t pme_code;
+   const char *pme_name;
+   const char *pme_short_desc;
+   const char *pme_long_desc;
 } pme_power_entry_t;
 
 typedef struct {
-   char *pme_name;
+   const char *pme_name;
+   const char *pme_desc;
    unsigned pme_code;
-   char *pme_desc;
    uint64_t pme_modmsk;
 } pme_torrent_entry_t;
 
@@ -93,6 +93,7 @@ typedef struct {
 #define PV_POWER7p	0x004a
 #define PV_970MP	0x0044
 #define PV_970GX	0x0045
+#define PV_POWER8	0x004b
 
 extern int pfm_gen_powerpc_get_event_info(void *this, int pidx, pfm_event_info_t *info);
 extern int pfm_gen_powerpc_get_event_attr_info(void *this, int pidx, int umask_idx, pfm_event_attr_info_t *info);
@@ -104,6 +105,7 @@ extern int pfm_gen_powerpc_validate_table(void *this, FILE *fp);
 extern void pfm_gen_powerpc_perf_validate_pattrs(void *this, pfmlib_event_desc_t *e);
 
 extern int pfm_gen_powerpc_get_perf_encoding(void *this, pfmlib_event_desc_t *e);
+extern int pfm_gen_powerpc_get_nest_perf_encoding(void *this, pfmlib_event_desc_t *e);
 #endif /* _POWER_REG_H */
 #endif
 

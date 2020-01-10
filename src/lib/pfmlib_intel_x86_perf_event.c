@@ -99,20 +99,49 @@ pfm_intel_x86_get_perf_encoding(void *this, pfmlib_event_desc_t *e)
 		DPRINT("%s: unsupported count=%d\n", e->count);
 		return PFM_ERR_NOTSUPP;
 	}
-
+	/* default PMU type */
 	attr->type = PERF_TYPE_RAW;
+
+	/*
+	 * if PMU specifies a perf PMU name, then grab the type
+	 * from sysfs as it is most likely dynamically assigned.
+	 * This allows this function to use used by some uncore PMUs
+	 */
+	if (pmu->perf_name) {
+		int type = find_pmu_type_by_name(pmu->perf_name);
+		if (type == PFM_ERR_NOTSUPP) {
+			DPRINT("perf PMU %s, not supported by OS\n", pmu->perf_name);
+		} else {
+			DPRINT("PMU %s perf type=%d\n", pmu->name, type);
+			attr->type = type;
+		}
+	}
+
 	attr->config = e->codes[0];
 
 	if (e->count > 1) {
 		/*
 		 * Nehalem/Westmere/Sandy Bridge OFFCORE_RESPONSE events
-		 * take two MSRs. lower level returns two codes:
+		 * take two MSRs. Lower level returns two codes:
 		 * - codes[0] goes to regular counter config
 		 * - codes[1] goes into extra MSR
 		 */
 		if (intel_x86_eflag(this, e->event, INTEL_X86_NHM_OFFCORE)) {
 			if (e->count != 2) {
 				DPRINT("perf_encoding: offcore=1 count=%d\n", e->count);
+				return PFM_ERR_INVAL;
+			}
+			attr->config1 = e->codes[1];
+		}
+		/*
+		 * SkyLake FRONTEND_RETIRED event
+		 * takes two MSRs. Lower level returns two codes:
+		 * - codes[0] goes to regular counter config
+		 * - codes[1] goes into extra MSR
+		 */
+		if (intel_x86_eflag(this, e->event, INTEL_X86_FRONTEND)) {
+			if (e->count != 2) {
+				DPRINT("perf_encoding: frontend_retired=1 count=%d\n", e->count);
 				return PFM_ERR_INVAL;
 			}
 			attr->config1 = e->codes[1];
@@ -233,6 +262,7 @@ pfm_intel_x86_perf_validate_pattrs(void *this, pfmlib_event_desc_t *e)
 	pfmlib_pmu_t *pmu = this;
 	int i, compact;
 	int has_pebs = intel_x86_event_has_pebs(this, e);
+	int no_smpl = pmu->flags & PFMLIB_PMU_FL_NO_SMPL;
 
 	for (i = 0; i < e->npattrs; i++) {
 		compact = 0;
@@ -261,18 +291,37 @@ pfm_intel_x86_perf_validate_pattrs(void *this, pfmlib_event_desc_t *e)
 			if (e->pattrs[i].idx == PERF_ATTR_H)
 				compact = 1;
 
+			if (no_smpl
+			    && (   e->pattrs[i].idx == PERF_ATTR_FR
+			        || e->pattrs[i].idx == PERF_ATTR_PR
+			        || e->pattrs[i].idx == PERF_ATTR_PE))
+				compact = 1;
 			/*
-			 * uncore has no priv level support
+			 * no priv level support
 			 */
-			if (pmu->type == PFM_PMU_TYPE_UNCORE
-			    && (e->pattrs[i].idx == PERF_ATTR_U
-			        || e->pattrs[i].idx == PERF_ATTR_K))
+			if (pmu->supported_plm == 0
+			    && (   e->pattrs[i].idx == PERF_ATTR_U
+			        || e->pattrs[i].idx == PERF_ATTR_K
+			        || e->pattrs[i].idx == PERF_ATTR_MG
+			        || e->pattrs[i].idx == PERF_ATTR_MH))
 				compact = 1;
 		}
 
 		if (compact) {
+			/* e->npattrs modified by call */
 			pfmlib_compact_pattrs(e, i);
+			/* compensate for i++ */
 			i--;
 		}
 	}
+}
+
+int
+pfm_intel_x86_perf_detect(void *this)
+{
+	pfmlib_pmu_t *pmu = this;
+	char file[64];
+
+	snprintf(file,sizeof(file), "/sys/devices/%s", pmu->perf_name);
+	return access(file, R_OK|X_OK) ? PFM_ERR_NOTSUPP : PFM_SUCCESS;
 }

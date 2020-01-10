@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <perfmon/pfmlib_perf_event.h>
 
 #include "pfmlib_priv.h"
@@ -44,6 +45,10 @@ static const pfmlib_attr_desc_t perf_event_mods[]={
 	PFM_ATTR_B("u", "monitor at user level"),	/* monitor user level */
 	PFM_ATTR_B("k", "monitor at kernel level"),	/* monitor kernel level */
 	PFM_ATTR_B("h", "monitor at hypervisor level"),	/* monitor hypervisor level */
+	PFM_ATTR_SKIP,
+	PFM_ATTR_SKIP,
+	PFM_ATTR_SKIP,
+	PFM_ATTR_SKIP,
 	PFM_ATTR_B("mg", "monitor guest execution"),	/* monitor guest level */
 	PFM_ATTR_B("mh", "monitor host execution"),	/* monitor host level */
 	PFM_ATTR_NULL /* end-marker to avoid exporting number of entries */
@@ -63,6 +68,8 @@ static const pfmlib_attr_desc_t perf_event_ext_mods[]={
 	PFM_ATTR_B("excl", "exclusive access"),    	/* exclusive PMU access */
 	PFM_ATTR_B("mg", "monitor guest execution"),	/* monitor guest level */
 	PFM_ATTR_B("mh", "monitor host execution"),	/* monitor host level */
+	PFM_ATTR_I("cpu", "CPU to program"),		/* CPU to program */
+	PFM_ATTR_B("pinned", "pin event to counters"),	/* pin event  to PMU */
 	PFM_ATTR_NULL /* end-marker to avoid exporting number of entries */
 };
 
@@ -80,6 +87,7 @@ pfmlib_perf_event_encode(void *this, const char *str, int dfl_plm, void *data)
 	uint64_t ival;
 	int has_plm = 0, has_vmx_plm = 0;
 	int i, plm = 0, ret, vmx_plm = 0;
+	int cpu = -1, pinned = 0;
 
 	sz = pfmlib_check_struct(uarg, uarg->size, PFM_PERF_ENCODE_ABI0, sz);
 	if (!sz)
@@ -172,19 +180,25 @@ pfmlib_perf_event_encode(void *this, const char *str, int dfl_plm, void *data)
 			has_plm = 1;
 			break;
 		case PERF_ATTR_PE:
-			if (!ival || attr->freq)
-				return PFM_ERR_ATTR_VAL;
+			if (!ival || attr->freq) {
+				ret = PFM_ERR_ATTR_VAL;
+				goto done;
+			}
 			attr->sample_period = ival;
 			break;
 		case PERF_ATTR_FR:
-			if (!ival)
-				return PFM_ERR_ATTR_VAL;
+			if (!ival || attr->sample_period) {
+				ret = PFM_ERR_ATTR_VAL;
+				goto done;
+			}
 			attr->sample_freq = ival;
 			attr->freq = 1;
 			break;
 		case PERF_ATTR_PR:
-			if (ival > 3)
-				return PFM_ERR_ATTR_VAL;
+			if (ival > 3) {
+				ret = PFM_ERR_ATTR_VAL;
+				goto done;
+			}
 			attr->precise_ip = ival;
 			break;
 		case PERF_ATTR_EX:
@@ -198,6 +212,16 @@ pfmlib_perf_event_encode(void *this, const char *str, int dfl_plm, void *data)
 		case PERF_ATTR_MH:
 			vmx_plm |= PFM_PLM0;
 			has_vmx_plm = 1;
+			break;
+		case PERF_ATTR_CPU:
+			if (ival >= INT_MAX) {
+				ret = PFM_ERR_ATTR_VAL;
+				goto done;
+			}
+			cpu = (int)ival;
+			break;
+		case PERF_ATTR_PIN:
+			pinned = (int)!!ival;
 			break;
 		}
 	}
@@ -216,17 +240,19 @@ pfmlib_perf_event_encode(void *this, const char *str, int dfl_plm, void *data)
 	 * goal here is to set to zero any exclude_* not supported
 	 * by underlying PMU
 	 */
-	plm |= (~pmu->supported_plm) & PFM_PLM_ALL;
+	plm     |= (~pmu->supported_plm) & PFM_PLM_ALL;
+	vmx_plm |= (~pmu->supported_plm) & PFM_PLM_ALL;
 
 	attr->exclude_user   = !(plm & PFM_PLM3);
 	attr->exclude_kernel = !(plm & PFM_PLM0);
 	attr->exclude_hv     = !(plm & PFM_PLMH);
 	attr->exclude_guest  = !(vmx_plm & PFM_PLM3);
 	attr->exclude_host   = !(vmx_plm & PFM_PLM0);
+	attr->pinned	     = pinned;
 
 	__pfm_vbprintf("PERF[type=%x config=0x%"PRIx64" config1=0x%"PRIx64
                        " excl=%d e_u=%d e_k=%d e_hv=%d e_host=%d e_gu=%d period=%"PRIu64" freq=%d"
-                       " precise=%d] %s\n",
+                       " precise=%d pinned=%d] %s\n",
 			attr->type,
 			attr->config,
 			attr->config1,
@@ -239,12 +265,16 @@ pfmlib_perf_event_encode(void *this, const char *str, int dfl_plm, void *data)
 			attr->sample_period,
 			attr->freq,
 			attr->precise_ip,
+			attr->pinned,
 			str);
 
 	/*
 	 * propagate event index if necessary
 	 */
 	arg.idx = pfmlib_pidx2idx(e.pmu, e.event);
+
+	/* propagate cpu */
+	arg.cpu = cpu;
 
 	/* propagate our changes, that overwrites attr->size */
 	memcpy(uarg->attr, attr, asz);
@@ -294,6 +324,9 @@ pfmlib_perf_event_encode(void *this, const char *str, int dfl_plm, void *data)
 		case PERF_ATTR_MH:
 			evt_strcat(e.fstr, ":%s=%lu", perf_event_ext_mods[idx].name, !attr->exclude_host);
 			break;
+		case PERF_ATTR_EX:
+			evt_strcat(e.fstr, ":%s=%lu", perf_event_ext_mods[idx].name, attr->exclusive);
+			break;
 		}
 	}
 
@@ -312,11 +345,12 @@ static int
 perf_get_os_nattrs(void *this, pfmlib_event_desc_t *e)
 {
 	pfmlib_os_t *os = this;
-	int i = 0;
+	int i, n = 0;
 
-	for (; os->atdesc[i].name; i++);
-
-	return i;
+	for (i = 0; os->atdesc[i].name; i++)
+		if (!is_empty_attr(os->atdesc+i))
+			n++;
+	return n;
 }
 
 static int
@@ -324,10 +358,14 @@ perf_get_os_attr_info(void *this, pfmlib_event_desc_t *e)
 {
 	pfmlib_os_t *os = this;
 	pfm_event_attr_info_t *info;
-	int i, j = e->npattrs;
+	int i, k, j = e->npattrs;
 
-	for (i = 0; os->atdesc[i].name; i++, j++) {
-		info = e->pattrs+j;
+	for (i = k = 0; os->atdesc[i].name; i++) {
+		/* skip padding entries */
+		if (is_empty_attr(os->atdesc+i))
+			continue;
+
+		info = e->pattrs + j + k;
 
 		info->name = os->atdesc[i].name;
 		info->desc = os->atdesc[i].desc;
@@ -337,8 +375,9 @@ perf_get_os_attr_info(void *this, pfmlib_event_desc_t *e)
 		info->type = os->atdesc[i].type;
 		info->is_dfl = 0;
 		info->ctrl = PFM_ATTR_CTRL_PERF_EVENT;
+		k++;
 	}
-	e->npattrs += i;
+	e->npattrs += k;
 
 	return PFM_SUCCESS;
 }

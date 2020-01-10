@@ -30,26 +30,10 @@
 
 #include "events/intel_snb_unc_events.h"
 
-static int
-pfm_snb_unc_detect(void *this)
-{
-	int ret;
-
-	ret = pfm_intel_x86_detect();
-	if (ret != PFM_SUCCESS)
-		return ret;
-
-	if (pfm_intel_x86_cfg.family != 6)
-		return PFM_ERR_NOTSUPP;
-
-	switch (pfm_intel_x86_cfg.model) {
-		case 42: /* Sandy Bridge (Core i7 26xx, 25xx) */
-			break;
-		default:
-			return PFM_ERR_NOTSUPP;
-	}
-	return PFM_SUCCESS;
-}
+static const int snb_models[] = {
+	42, /* Sandy Bridge (Core i7 26xx, 25xx) */
+	0
+};
 
 #define SNB_UNC_CBOX(n, p) \
 pfmlib_pmu_t intel_snb_unc_cbo##n##_support={ \
@@ -64,10 +48,14 @@ pfmlib_pmu_t intel_snb_unc_cbo##n##_support={ \
 	.max_encoding		= 1,\
 	.pe			= intel_snb_unc_##p##_pe, \
 	.atdesc			= intel_x86_mods, \
-	.flags			= PFMLIB_PMU_FL_RAW_UMASK, \
-	.pmu_detect		= pfm_snb_unc_detect, \
+	.flags			= PFMLIB_PMU_FL_RAW_UMASK\
+				| PFMLIB_PMU_FL_NO_SMPL,\
+	.cpu_family		= 6,\
+	.cpu_models		= snb_models, \
+	.pmu_detect		= pfm_intel_x86_model_detect,\
 	.get_event_encoding[PFM_OS_NONE] = pfm_intel_x86_get_encoding, \
 	 PFMLIB_ENCODE_PERF(pfm_intel_nhm_unc_get_perf_encoding), \
+	 PFMLIB_OS_DETECT(pfm_intel_x86_perf_detect), \
 	.get_event_first	= pfm_intel_x86_get_event_first, \
 	.get_event_next		= pfm_intel_x86_get_event_next, \
 	.event_is_valid		= pfm_intel_x86_event_is_valid, \

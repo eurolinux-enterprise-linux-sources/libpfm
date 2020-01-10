@@ -27,7 +27,7 @@
 #define INTEL_SNB_UNC_ATTRS \
 	(_INTEL_X86_ATTR_I|_INTEL_X86_ATTR_E|_INTEL_X86_ATTR_C)
 
-/* same event table and SNB */
+/* same event table as SNB */
 #include "events/intel_snb_unc_events.h"
 
 static int
@@ -64,10 +64,12 @@ pfmlib_pmu_t intel_ivb_unc_cbo##n##_support={ \
 	.max_encoding		= 1,\
 	.pe			= intel_snb_unc_##p##_pe, \
 	.atdesc			= intel_x86_mods, \
-	.flags			= PFMLIB_PMU_FL_RAW_UMASK, \
+	.flags			= PFMLIB_PMU_FL_RAW_UMASK\
+				| PFMLIB_PMU_FL_NO_SMPL,\
 	.pmu_detect		= pfm_ivb_unc_detect, \
 	.get_event_encoding[PFM_OS_NONE] = pfm_intel_x86_get_encoding, \
 	 PFMLIB_ENCODE_PERF(pfm_intel_nhm_unc_get_perf_encoding), \
+	 PFMLIB_OS_DETECT(pfm_intel_x86_perf_detect), \
 	.get_event_first	= pfm_intel_x86_get_event_first, \
 	.get_event_next		= pfm_intel_x86_get_event_next, \
 	.event_is_valid		= pfm_intel_x86_event_is_valid, \

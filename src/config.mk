@@ -45,6 +45,9 @@ endif
 ifeq (i86pc,$(findstring i86pc,$(ARCH)))
 override ARCH=i386
 endif
+ifeq (x86,$(findstring x86,$(ARCH)))
+override ARCH=x86_64
+endif
 ifeq ($(ARCH),x86_64)
 override ARCH=x86_64
 endif
@@ -61,6 +64,15 @@ ifeq (armv6,$(findstring armv6,$(ARCH)))
 override ARCH=arm
 endif
 ifeq (armv7,$(findstring armv7,$(ARCH)))
+override ARCH=arm
+endif
+ifeq (armv7,$(findstring armv7,$(ARCH)))
+override ARCH=arm
+endif
+ifeq (aarch32,$(findstring aarch32,$(ARCH)))
+override ARCH=arm
+endif
+ifeq (armv8l,$(findstring armv8l,$(ARCH)))
 override ARCH=arm
 endif
 ifeq (mips64,$(findstring mips64,$(ARCH)))
@@ -98,7 +110,7 @@ endif
 # Library version
 #
 VERSION=4
-REVISION=4
+REVISION=7
 AGE=0
 
 #
@@ -149,12 +161,16 @@ ifeq ($(ARCH),arm)
 CONFIG_PFMLIB_ARCH_ARM=y
 endif
 
-ifeq ($(ARCH),s390x)
-CONFIG_PFMLIB_ARCH_S390X=y
+ifeq ($(ARCH),aarch64)
+CONFIG_PFMLIB_ARCH_ARM64=y
 endif
 
-ifeq ($(XTPE_COMPILE_TARGET),linux)
-CONFIG_PFMLIB_ARCH_CRAYXT=y
+ifeq ($(ARCH),arm64)
+CONFIG_PFMLIB_ARCH_ARM64=y
+endif
+
+ifeq ($(ARCH),s390x)
+CONFIG_PFMLIB_ARCH_S390X=y
 endif
 
 ifeq ($(ARCH),cell)

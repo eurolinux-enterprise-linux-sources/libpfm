@@ -76,6 +76,7 @@ static pfmlib_pmu_t *pfmlib_pmus[]=
 	&amd64_fam12h_llano_support,
 	&amd64_fam14h_bobcat_support,
 	&amd64_fam15h_interlagos_support,
+	&amd64_fam15h_nb_support,
 	&intel_core_support,
 	&intel_atom_support,
 	&intel_nhm_support,
@@ -97,6 +98,10 @@ static pfmlib_pmu_t *pfmlib_pmus[]=
 	&intel_ivb_unc_cbo3_support,
 	&intel_ivb_ep_support,
 	&intel_hsw_support,
+	&intel_hsw_ep_support,
+	&intel_bdw_support,
+	&intel_skl_support,
+	&intel_rapl_support,
 	&intel_snbep_unc_cb0_support,
 	&intel_snbep_unc_cb1_support,
 	&intel_snbep_unc_cb2_support,
@@ -118,6 +123,83 @@ static pfmlib_pmu_t *pfmlib_pmus[]=
 	&intel_snbep_unc_r3qpi0_support,
 	&intel_snbep_unc_r3qpi1_support,
 	&intel_knc_support,
+	&intel_slm_support,
+	&intel_ivbep_unc_cb0_support,
+	&intel_ivbep_unc_cb1_support,
+	&intel_ivbep_unc_cb2_support,
+	&intel_ivbep_unc_cb3_support,
+	&intel_ivbep_unc_cb4_support,
+	&intel_ivbep_unc_cb5_support,
+	&intel_ivbep_unc_cb6_support,
+	&intel_ivbep_unc_cb7_support,
+	&intel_ivbep_unc_cb8_support,
+	&intel_ivbep_unc_cb9_support,
+	&intel_ivbep_unc_cb10_support,
+	&intel_ivbep_unc_cb11_support,
+	&intel_ivbep_unc_cb12_support,
+	&intel_ivbep_unc_cb13_support,
+	&intel_ivbep_unc_cb14_support,
+	&intel_ivbep_unc_ha0_support,
+	&intel_ivbep_unc_ha1_support,
+	&intel_ivbep_unc_imc0_support,
+	&intel_ivbep_unc_imc1_support,
+	&intel_ivbep_unc_imc2_support,
+	&intel_ivbep_unc_imc3_support,
+	&intel_ivbep_unc_imc4_support,
+	&intel_ivbep_unc_imc5_support,
+	&intel_ivbep_unc_imc6_support,
+	&intel_ivbep_unc_imc7_support,
+	&intel_ivbep_unc_pcu_support,
+	&intel_ivbep_unc_qpi0_support,
+	&intel_ivbep_unc_qpi1_support,
+	&intel_ivbep_unc_qpi2_support,
+	&intel_ivbep_unc_ubo_support,
+	&intel_ivbep_unc_r2pcie_support,
+	&intel_ivbep_unc_r3qpi0_support,
+	&intel_ivbep_unc_r3qpi1_support,
+	&intel_ivbep_unc_r3qpi2_support,
+	&intel_ivbep_unc_irp_support,
+	&intel_hswep_unc_cb0_support,
+	&intel_hswep_unc_cb1_support,
+	&intel_hswep_unc_cb2_support,
+	&intel_hswep_unc_cb3_support,
+	&intel_hswep_unc_cb4_support,
+	&intel_hswep_unc_cb5_support,
+	&intel_hswep_unc_cb6_support,
+	&intel_hswep_unc_cb7_support,
+	&intel_hswep_unc_cb8_support,
+	&intel_hswep_unc_cb9_support,
+	&intel_hswep_unc_cb10_support,
+	&intel_hswep_unc_cb11_support,
+	&intel_hswep_unc_cb12_support,
+	&intel_hswep_unc_cb13_support,
+	&intel_hswep_unc_cb14_support,
+	&intel_hswep_unc_cb15_support,
+	&intel_hswep_unc_cb16_support,
+	&intel_hswep_unc_cb17_support,
+	&intel_hswep_unc_ha0_support,
+	&intel_hswep_unc_ha1_support,
+	&intel_hswep_unc_imc0_support,
+	&intel_hswep_unc_imc1_support,
+	&intel_hswep_unc_imc2_support,
+	&intel_hswep_unc_imc3_support,
+	&intel_hswep_unc_imc4_support,
+	&intel_hswep_unc_imc5_support,
+	&intel_hswep_unc_imc6_support,
+	&intel_hswep_unc_imc7_support,
+	&intel_hswep_unc_pcu_support,
+	&intel_hswep_unc_qpi0_support,
+	&intel_hswep_unc_qpi1_support,
+	&intel_hswep_unc_sb0_support,
+	&intel_hswep_unc_sb1_support,
+	&intel_hswep_unc_sb2_support,
+	&intel_hswep_unc_sb3_support,
+	&intel_hswep_unc_ubo_support,
+	&intel_hswep_unc_r2pcie_support,
+	&intel_hswep_unc_r3qpi0_support,
+	&intel_hswep_unc_r3qpi1_support,
+	&intel_hswep_unc_r3qpi2_support,
+	&intel_hswep_unc_irp_support,
 	&intel_x86_arch_support, /* must always be last for x86 */
 #endif
 
@@ -137,7 +219,10 @@ static pfmlib_pmu_t *pfmlib_pmus[]=
 	&power5p_support,
 	&power6_support,
 	&power7_support,
+	&power8_support,
 	&torrent_support,
+    &powerpc_nest_mcs_read_support,
+    &powerpc_nest_mcs_write_support,
 #endif
 
 #ifdef CONFIG_PFMLIB_ARCH_SPARC
@@ -155,21 +240,35 @@ static pfmlib_pmu_t *pfmlib_pmus[]=
 #endif
 
 #ifdef CONFIG_PFMLIB_ARCH_ARM
+	&arm_cortex_a7_support,
 	&arm_cortex_a8_support,
 	&arm_cortex_a9_support,
 	&arm_cortex_a15_support,
 	&arm_1176_support,
+	&arm_qcom_krait_support,
+	&arm_cortex_a57_support,
+	&arm_cortex_a53_support,
+	&arm_xgene_support,
 #endif
+#ifdef CONFIG_PFMLIB_ARCH_ARM64
+	&arm_cortex_a57_support,
+	&arm_cortex_a53_support,
+	&arm_xgene_support,
+#endif
+
 #ifdef CONFIG_PFMLIB_ARCH_S390X
 	&s390x_cpum_cf_support,
+	&s390x_cpum_sf_support,
 #endif
 #ifdef __linux__
 	&perf_event_support,
+	&perf_event_raw_support,
 #endif
 };
 #define PFMLIB_NUM_PMUS	(int)(sizeof(pfmlib_pmus)/sizeof(pfmlib_pmu_t *))
 
 static pfmlib_os_t pfmlib_os_none;
+pfmlib_os_t *pfmlib_os = &pfmlib_os_none;
 
 static pfmlib_os_t *pfmlib_oses[]={
 	&pfmlib_os_none,
@@ -498,6 +597,10 @@ pfmlib_init_env(void)
 	str = getenv("LIBPFM_ENCODE_INACTIVE");
 	if (str)
 		pfm_cfg.inactive = 1;
+
+	str = getenv("LIBPFM_DISABLED_PMUS");
+	if (str)
+		pfm_cfg.blacklist_pmus = str;
 }
 
 static int
@@ -531,7 +634,7 @@ pfmlib_build_fstr(pfmlib_event_desc_t *e, char **fstr)
 	if (*fstr)
 		sprintf(*fstr, "%s::%s", e->pmu->name, e->fstr);
 
-	return fstr ? PFM_SUCCESS : PFM_ERR_NOMEM;
+	return *fstr ? PFM_SUCCESS : PFM_ERR_NOMEM;
 }
 
 static int
@@ -569,6 +672,27 @@ pfmlib_match_forced_pmu(const char *name)
 }
 
 static int
+pfmlib_is_blacklisted_pmu(pfmlib_pmu_t *p)
+{
+	if (!pfm_cfg.blacklist_pmus)
+		return 0;
+
+	/*
+	 * scan list for matching PMU names, we accept substrings.
+	 * for instance: snbep does match snbep*
+	 */
+	char *q, buffer[strlen(pfm_cfg.blacklist_pmus) + 1];
+
+	strcpy (buffer, pfm_cfg.blacklist_pmus);
+	for (q = strtok (buffer, ","); q != NULL; q = strtok (NULL, ",")) {
+		if (strstr (p->name, q) != NULL) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int
 pfmlib_init_pmus(void)
 {
 	pfmlib_pmu_t *p;
@@ -600,6 +724,10 @@ pfmlib_init_pmus(void)
 		if (pfmlib_pmu_sanity_checks(p) != PFM_SUCCESS)
 			continue;
 
+		if (pfmlib_is_blacklisted_pmu(p)) {
+			DPRINT("%d PMU blacklisted, skipping initialization\n");
+			continue;
+		}
 		p->flags |= PFMLIB_PMU_FL_INIT;
 
 		/*
@@ -609,6 +737,17 @@ pfmlib_init_pmus(void)
 
 		if (ret != PFM_SUCCESS)
 			continue;
+
+		/*
+		 * check if exported by OS if needed
+		 */
+		if (p->os_detect[pfmlib_os->id]) {
+			ret = p->os_detect[pfmlib_os->id](p);
+			if (ret != PFM_SUCCESS) {
+				DPRINT("%s PMU not exported by OS\n", p->name);
+				continue;
+			}
+		}
 
 		ret = pfmlib_pmu_activate(p);
 		if (ret == PFM_SUCCESS)
@@ -641,9 +780,13 @@ pfmlib_init_os(void)
 		if (os->detect(os) != PFM_SUCCESS)
 			continue;
 
+		if (os != &pfmlib_os_none && pfmlib_os == &pfmlib_os_none)
+			pfmlib_os = os;
+
 		DPRINT("OS layer %s activated\n", os->name);
 		os->flags = PFMLIB_OS_FL_ACTIVATED;
 	}
+	DPRINT("default OS layer: %s\n", pfmlib_os->name);
 }
 
 int
@@ -652,27 +795,29 @@ pfm_initialize(void)
 	int ret;
 	/*
 	 * not atomic
+	 * if initialization already done, then reurn previous return value
 	 */
 	if (pfm_cfg.initdone)
-		return PFM_SUCCESS;
+		return pfm_cfg.initret;
 
 	/*
 	 * generic sanity checks
 	 */
 	if (PFM_PMU_MAX & (~PFMLIB_PMU_MASK)) {
 		DPRINT("PFM_PMU_MAX exceeds PFMLIB_PMU_MASK\n");	
-		return PFM_ERR_NOTSUPP;
+		ret = PFM_ERR_NOTSUPP;
+	} else {
+
+		pfmlib_init_env();
+
+		/* must be done before pfmlib_init_pmus() */
+		pfmlib_init_os();
+
+		ret = pfmlib_init_pmus();
 	}
 
-	pfmlib_init_env();
-
-	ret = pfmlib_init_pmus();
-	if (ret != PFM_SUCCESS)
-		return ret;
-
-	pfmlib_init_os();
-
 	pfm_cfg.initdone = 1;
+	pfm_cfg.initret  = ret;
 
 	return ret;
 }
@@ -711,8 +856,16 @@ pfm_find_event(const char *str)
 	memset(&e, 0, sizeof(e));
 
 	ret = pfmlib_parse_event(str, &e);
-	if (ret == PFM_SUCCESS)
-		return pfmlib_pidx2idx(e.pmu, e.event);
+	if (ret == PFM_SUCCESS) {
+		/*
+		 * save index so we can return it
+		 * and free the pattrs data that was
+		 * allocated in pfmlib_parse_event()
+		 */
+		ret = pfmlib_pidx2idx(e.pmu, e.event);
+
+		pfmlib_release_event(&e);
+	}
 
 	return ret;
 }
@@ -806,6 +959,7 @@ pfmlib_parse_event_attr(char *str, pfmlib_event_desc_t *d)
 				goto found_attr;
 			}
 		}
+		DPRINT("cannot find attribute %s\n", s);
 		return PFM_ERR_ATTR;
 found_attr:
 		type = ainfo->type;
@@ -847,7 +1001,7 @@ found_attr:
 		if (type != PFM_ATTR_UMASK && type != PFM_ATTR_RAW_UMASK && !has_val) {
 			if (type != PFM_ATTR_MOD_BOOL)
 				return PFM_ERR_ATTR_VAL;
-			has_val = 1; s = yes; /* no const */
+			s = yes; /* no const */
 			goto handle_bool;
 		}
 
@@ -973,10 +1127,17 @@ pfmlib_release_event(pfmlib_event_desc_t *e)
 }
 
 static int
+match_event(void *this, pfmlib_event_desc_t *d, const char *e, const char *s)
+{
+	return strcasecmp(e, s);
+}
+
+static int
 pfmlib_parse_equiv_event(const char *event, pfmlib_event_desc_t *d)
 {
 	pfmlib_pmu_t *pmu = d->pmu;
 	pfm_event_info_t einfo;
+	int (*match)(void *this, pfmlib_event_desc_t *d, const char *e, const char *s);
 	char *str, *s, *p;
 	int i;
 	int ret;
@@ -992,11 +1153,13 @@ pfmlib_parse_equiv_event(const char *event, pfmlib_event_desc_t *d)
 	if (p)
 		*p++ = '\0';
 
+	match = pmu->match_event ? pmu->match_event : match_event;
+
 	pfmlib_for_each_pmu_event(pmu, i) {
 		ret = pmu->get_event_info(pmu, i, &einfo);
 		if (ret != PFM_SUCCESS)
 			goto error;
-		if (!strcasecmp(einfo.name, s))
+		if (!match(pmu, d, einfo.name, s))
 			goto found;
 	}
 	free(str);
@@ -1032,6 +1195,7 @@ pfmlib_parse_event(const char *event, pfmlib_event_desc_t *d)
 	pfm_event_info_t einfo;
 	char *str, *s, *p;
 	pfmlib_pmu_t *pmu;
+	int (*match)(void *this, pfmlib_event_desc_t *d, const char *e, const char *s);
 	const char *pname = NULL;
 	int i, j, ret;
 
@@ -1085,6 +1249,8 @@ pfmlib_parse_event(const char *event, pfmlib_event_desc_t *d)
 		 */
 		if (pname && !pfmlib_pmu_active(pmu) && !pfm_cfg.inactive)
 			continue;
+
+		match = pmu->match_event ? pmu->match_event : match_event;
 		/*
 		 * for each event
 		 */
@@ -1092,7 +1258,7 @@ pfmlib_parse_event(const char *event, pfmlib_event_desc_t *d)
 			ret = pmu->get_event_info(pmu, i, &einfo);
 			if (ret != PFM_SUCCESS)
 				goto error;
-			if (!strcasecmp(einfo.name, s))
+			if (!match(pmu, d, einfo.name, s))
 				goto found;
 		}
 	}
@@ -1761,7 +1927,8 @@ pfmlib_raw_pmu_encode(void *this, const char *str, int dfl_plm, void *data)
 
 	if (!pmu->get_event_encoding[PFM_OS_NONE]) {
 		DPRINT("PMU %s does not support PFM_OS_NONE\n", pmu->name);
-		return PFM_ERR_NOTSUPP;
+		ret = PFM_ERR_NOTSUPP;
+		goto error;
 	}
 
 	ret = pmu->get_event_encoding[PFM_OS_NONE](pmu, &e);

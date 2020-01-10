@@ -40,10 +40,15 @@ const pfmlib_attr_desc_t intel_x86_mods[]={
 	PFM_ATTR_I("c", "counter-mask in range [0-255]"),	/* counter-mask */
 	PFM_ATTR_B("t", "measure any thread"),			/* monitor on both threads */
 	PFM_ATTR_I("ldlat", "load latency threshold (cycles, [3-65535])"),	/* load latency threshold */
+	PFM_ATTR_B("intx", "monitor only inside transactional memory region"),
+	PFM_ATTR_B("intxcp", "do not count occurrences inside aborted transactional memory region"),
+	PFM_ATTR_I("fe_thres", "frontend bubble latency threshold in cycles ([1-4095]"),
 	PFM_ATTR_NULL /* end-marker to avoid exporting number of entries */
 };
 
 pfm_intel_x86_config_t pfm_intel_x86_cfg;
+
+#define mdhw(m, u, at) (m & u & _INTEL_X86_##at)
 
 /*
  * .byte 0x53 == push ebx. it's universal for 32 and 64 bit
@@ -158,6 +163,7 @@ pfm_intel_x86_detect(void)
 
 	pfm_intel_x86_cfg.family = (a >> 8) & 0xf;  // bits 11 - 8
 	pfm_intel_x86_cfg.model  = (a >> 4) & 0xf;  // Bits  7 - 4
+	pfm_intel_x86_cfg.stepping = a & 0xf;	    // Bits 0 - 3
 
 	/* extended family */
 	if (pfm_intel_x86_cfg.family == 0xf)
@@ -168,6 +174,26 @@ pfm_intel_x86_detect(void)
 		pfm_intel_x86_cfg.model += ((a >> 16) & 0xf) << 4;
 
 	return PFM_SUCCESS;
+}
+
+int pfm_intel_x86_model_detect(void *this)
+{
+	pfmlib_pmu_t *pmu = this;
+	const int *p;
+	int ret;
+
+	ret = pfm_intel_x86_detect();
+	if (ret != PFM_SUCCESS)
+		return ret;
+
+	if (pfm_intel_x86_cfg.family != pmu->cpu_family)
+		return PFM_ERR_NOTSUPP;
+
+	for (p = pmu->cpu_models; *p; p++) {
+		if (*p == pfm_intel_x86_cfg.model)
+			return PFM_SUCCESS;
+	}
+	return PFM_ERR_NOTSUPP;
 }
 
 int
@@ -212,9 +238,19 @@ pfm_intel_x86_add_defaults(void *this, pfmlib_event_desc_t *e,
 				continue;
 			}
 
+			if (intel_x86_uflag(this, e->event, idx, INTEL_X86_GRP_DFL_NONE)) {
+				skip = 1;
+				continue;
+			}
+
 			/* umask is default for group */
 			if (intel_x86_uflag(this, e->event, idx, INTEL_X86_DFL)) {
-				DPRINT("added default %s for group %d j=%d idx=%d\n", ent->umasks[idx].uname, i, j, idx);
+				DPRINT("added default %s for group %d j=%d idx=%d ucode=0x%"PRIx64"\n",
+					ent->umasks[idx].uname,
+					i,	
+					j,
+					idx,
+					ent->umasks[idx].ucode);
 				/*
 				 * default could be an alias, but
 				 * ucode must reflect actual code
@@ -243,7 +279,7 @@ pfm_intel_x86_add_defaults(void *this, pfmlib_event_desc_t *e,
 			return PFM_ERR_UMASK;
 		}
 	}
-	DPRINT("max_grpid=%d nattrs=%d k=%d\n", max_grpid, e->nattrs, k);
+	DPRINT("max_grpid=%d nattrs=%d k=%d umask=0x%"PRIx64"\n", max_grpid, e->nattrs, k, *umask);
 done:
 	e->nattrs = k;
 	return PFM_SUCCESS;
@@ -325,7 +361,7 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
 	pfmlib_pmu_t *pmu = this;
 	pfm_event_attr_info_t *a;
 	const intel_x86_entry_t *pe;
-	pfm_intel_x86_reg_t reg;
+	pfm_intel_x86_reg_t reg, reg2;
 	unsigned int grpmsk, ugrpmsk = 0;
 	uint64_t umask1, umask2, ucode, last_ucode = ~0ULL;
 	unsigned int modhw = 0;
@@ -336,6 +372,7 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
 	unsigned int last_grpid =  INTEL_X86_MAX_GRPID;
 	unsigned int grpid;
 	int ldlat = 0, ldlat_um = 0;
+	int fe_thr= 0, fe_thr_um = 0;
 	int grpcounts[INTEL_X86_NUM_GRP];
 	int ncombo[INTEL_X86_NUM_GRP];
 
@@ -404,6 +441,9 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
 
 			if (intel_x86_uflag(this, e->event, a->idx, INTEL_X86_LDLAT))
 				ldlat_um = 1;
+
+			if (intel_x86_uflag(this, e->event, a->idx, INTEL_X86_FETHR))
+				fe_thr_um = 1;
 			/*
 			 * if more than one umask in this group but one is marked
 			 * with ncombo, then fail. It is okay to combine umask within
@@ -446,42 +486,30 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
 			uint64_t ival = e->attrs[k].ival;
 			switch(a->idx) {
 				case INTEL_X86_ATTR_I: /* invert */
-					if (modhw & _INTEL_X86_ATTR_I)
-						return PFM_ERR_ATTR_SET;
 					reg.sel_inv = !!ival;
 					umodmsk |= _INTEL_X86_ATTR_I;
 					break;
 				case INTEL_X86_ATTR_E: /* edge */
-					if (modhw & _INTEL_X86_ATTR_E)
-						return PFM_ERR_ATTR_SET;
 					reg.sel_edge = !!ival;
 					umodmsk |= _INTEL_X86_ATTR_E;
 					break;
 				case INTEL_X86_ATTR_C: /* counter-mask */
-					if (modhw & _INTEL_X86_ATTR_C)
-						return PFM_ERR_ATTR_SET;
 					if (ival > 255)
 						return PFM_ERR_ATTR_VAL;
 					reg.sel_cnt_mask = ival;
 					umodmsk |= _INTEL_X86_ATTR_C;
 					break;
 				case INTEL_X86_ATTR_U: /* USR */
-					if (modhw & _INTEL_X86_ATTR_U)
-						return PFM_ERR_ATTR_SET;
 					reg.sel_usr = !!ival;
 					plmmsk |= _INTEL_X86_ATTR_U;
 					umodmsk |= _INTEL_X86_ATTR_U;
 					break;
 				case INTEL_X86_ATTR_K: /* OS */
-					if (modhw & _INTEL_X86_ATTR_K)
-						return PFM_ERR_ATTR_SET;
 					reg.sel_os = !!ival;
 					plmmsk |= _INTEL_X86_ATTR_K;
 					umodmsk |= _INTEL_X86_ATTR_K;
 					break;
 				case INTEL_X86_ATTR_T: /* anythread (v3 and above) */
-					if (modhw & _INTEL_X86_ATTR_T)
-						return PFM_ERR_ATTR_SET;
 					reg.sel_anythr = !!ival;
 					umodmsk |= _INTEL_X86_ATTR_T;
 					break;
@@ -490,10 +518,49 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
 						return PFM_ERR_ATTR_VAL;
 					ldlat = ival;
 					break;
-
+				case INTEL_X86_ATTR_INTX: /* in_tx */
+					reg.sel_intx = !!ival;
+					umodmsk |= _INTEL_X86_ATTR_INTX;
+					break;
+				case INTEL_X86_ATTR_INTXCP: /* in_tx_cp */
+					reg.sel_intxcp = !!ival;
+					umodmsk |= _INTEL_X86_ATTR_INTXCP;
+					break;
+				case INTEL_X86_ATTR_FETHR: /* precise frontend latency threshold */
+					if (ival < 1 || ival > 4095)
+						return PFM_ERR_ATTR_VAL;
+					fe_thr = ival;
+					break;
 			}
 		}
 	}
+	/*
+	 * we need to wait until all the attributes have been parsed to check
+	 * for conflicts between hardcoded attributes and user-provided attributes.
+	 * we do not want to depend on the order in which they are specified
+	 *
+	 * The test check for conflicts. It is okay to specify an attribute if
+	 * it encodes to the same same value as the hardcoded value. That allows
+	 * use to prase a FQESTR (fully-qualified event string) as returned by
+	 * the library
+	 */
+	reg2.val = (umask1 | umask2)  << 8;
+	if (mdhw(modhw, umodmsk, ATTR_I) && reg2.sel_inv != reg.sel_inv)
+		return PFM_ERR_ATTR_SET;
+	if (mdhw(modhw, umodmsk, ATTR_E) && reg2.sel_edge != reg.sel_edge)
+		return PFM_ERR_ATTR_SET;
+	if (mdhw(modhw, umodmsk, ATTR_C) && reg2.sel_cnt_mask != reg.sel_cnt_mask)
+		return PFM_ERR_ATTR_SET;
+	if (mdhw(modhw, umodmsk, ATTR_U) && reg2.sel_usr != reg.sel_usr)
+		return PFM_ERR_ATTR_SET;
+	if (mdhw(modhw, umodmsk, ATTR_K) && reg2.sel_os != reg.sel_os)
+		return PFM_ERR_ATTR_SET;
+	if (mdhw(modhw, umodmsk, ATTR_T) && reg2.sel_anythr != reg.sel_anythr)
+		return PFM_ERR_ATTR_SET;
+	if (mdhw(modhw, umodmsk, ATTR_INTX) && reg2.sel_intx != reg.sel_intx)
+		return PFM_ERR_ATTR_SET;
+	if (mdhw(modhw, umodmsk, ATTR_INTXCP) && reg2.sel_intxcp != reg.sel_intxcp)
+		return PFM_ERR_ATTR_SET;
 
 	/*
 	 * handle case where no priv level mask was passed.
@@ -551,7 +618,27 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
 			evt_strcat(e->fstr, ":0x%x", a->idx);
 	}
 
-	if (intel_x86_eflag(this, e->event, INTEL_X86_NHM_OFFCORE)) {
+	if (fe_thr_um && !fe_thr) {
+		/* try extracting te latency threshold from the event umask first */
+		fe_thr = (umask2 >> 8) & 0x7;
+		/* if not in the umask ,then use default */
+		if (!fe_thr) {
+			DPRINT("missing fe_thres= for umask, forcing to default %d cycles\n", INTEL_X86_FETHR_DEFAULT);
+			fe_thr = INTEL_X86_FETHR_DEFAULT;
+		}
+	}
+	/*
+	 * encode threshold in final position in extra register
+	 */
+	if (fe_thr && fe_thr_um) {
+		umask2 |= fe_thr << 8;
+	}
+
+	/*
+	 * offcore_response or precise frontend require a separate register
+	 */
+	if (intel_x86_eflag(this, e->event, INTEL_X86_NHM_OFFCORE)
+	    || intel_x86_eflag(this, e->event, INTEL_X86_FRONTEND)) {
 		e->codes[1] = umask2;
 		e->count = 2;
 		umask2 = 0;
@@ -626,6 +713,15 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
 			break;
 		case INTEL_X86_ATTR_LDLAT:
 			evt_strcat(e->fstr, ":%s=%d", intel_x86_mods[id].name, ldlat);
+			break;
+		case INTEL_X86_ATTR_INTX:
+			evt_strcat(e->fstr, ":%s=%lu", intel_x86_mods[id].name, reg.sel_intx);
+			break;
+		case INTEL_X86_ATTR_INTXCP:
+			evt_strcat(e->fstr, ":%s=%lu", intel_x86_mods[id].name, reg.sel_intxcp);
+			break;
+		case INTEL_X86_ATTR_FETHR:
+			evt_strcat(e->fstr, ":%s=%lu", intel_x86_mods[id].name, fe_thr);
 			break;
 		}
 	}

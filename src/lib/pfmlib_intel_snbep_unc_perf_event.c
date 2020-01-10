@@ -83,14 +83,21 @@ pfm_intel_snbep_unc_get_perf_encoding(void *this, pfmlib_event_desc_t *e)
 
 	attr->config = reg.val;
 
-	/*
-	 * various filters
-	 */
-	if (e->count == 2)
-		attr->config1 = e->codes[1];
+	if (is_cbo_filt_event(this, reg) && e->count > 1) {
+		if (e->count >= 2)
+			attr->config1 = e->codes[1];
+		if (e->count >= 3)
+			attr->config1 |= e->codes[2] << 32;
+	} else {
+		/*
+		 * various filters
+		 */
+		if (e->count >= 2)
+			attr->config1 = e->codes[1];
 
-	if (e->count == 3)
-		attr->config2 = e->codes[2];
+		if (e->count >= 3)
+			attr->config2 = e->codes[2];
+	}
 
 	/*
 	 * uncore measures at all priv levels
@@ -110,6 +117,8 @@ pfm_intel_snbep_unc_get_perf_encoding(void *this, pfmlib_event_desc_t *e)
 void
 pfm_intel_snbep_unc_perf_validate_pattrs(void *this, pfmlib_event_desc_t *e)
 {
+	pfmlib_pmu_t *pmu = this;
+	int no_smpl = pmu->flags & PFMLIB_PMU_FL_NO_SMPL;
 	int i, compact;
 
 	for (i = 0; i < e->npattrs; i++) {
@@ -130,11 +139,20 @@ pfm_intel_snbep_unc_perf_validate_pattrs(void *this, pfmlib_event_desc_t *e)
 			if (e->pattrs[i].idx == PERF_ATTR_H)
 				compact = 1;
 
+			if (no_smpl
+			    && (   e->pattrs[i].idx == PERF_ATTR_FR
+			        || e->pattrs[i].idx == PERF_ATTR_PR
+			        || e->pattrs[i].idx == PERF_ATTR_PE))
+				compact = 1;
+
 			/*
 			 * uncore has no priv level support
 			 */
-			if (   e->pattrs[i].idx == PERF_ATTR_U
-			    || e->pattrs[i].idx == PERF_ATTR_K)
+			if (pmu->supported_plm == 0
+			    && (   e->pattrs[i].idx == PERF_ATTR_U
+			        || e->pattrs[i].idx == PERF_ATTR_K
+			        || e->pattrs[i].idx == PERF_ATTR_MG
+			        || e->pattrs[i].idx == PERF_ATTR_MH))
 				compact = 1;
 		}
 

@@ -9,8 +9,8 @@
 %endif
 
 Name:		libpfm
-Version:	4.4.0
-Release:	11%{?dist}
+Version:	4.7.0
+Release:	1%{?dist}
 
 Summary:	Library to encode performance events for use by perf tool
 
@@ -18,10 +18,6 @@ Group:		System Environment/Libraries
 License:	MIT
 URL:		http://perfmon2.sourceforge.net/
 Source0:	http://sourceforge.net/projects/perfmon2/files/libpfm4/%{name}-%{version}.tar.gz
-Patch1: libpfm-power8.patch
-Patch11: libpfm-events.patch
-Patch200: libpfm-aarch64.patch
-Patch201: libpfm-s390.patch
 
 %if %{with python}
 BuildRequires:	python-devel
@@ -65,11 +61,6 @@ Python bindings for libpfm4 and perf_event_open system call.
 
 %prep
 %setup -q
-
-%patch1 -p1
-%patch11 -p1
-%patch200 -p1
-%patch201 -p1
 
 %build
 %if %{with python}
@@ -117,6 +108,9 @@ make \
 %endif
 
 %changelog
+* Thu May 12 2016 William Cohen <wcohen@redhat.com> - 4.7.0-1
+- Rebase to libpfm-4.7.0.
+
 * Thu Jun 4 2015 William Cohen <wcohen@redhat.com> - 4.4.0-11
 - Add additional s390 support. rhbz1182187
 

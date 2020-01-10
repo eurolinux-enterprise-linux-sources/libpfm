@@ -39,11 +39,6 @@ ifeq ($(ARCH),i386)
 DIRS += x86
 endif
 
-
-ifeq ($(CONFIG_PFMLIB_ARCH_CRAYXT),y)
-CFLAGS += -DCONFIG_PFMLIB_ARCH_CRAYXT
-endif
-
 CFLAGS+= -I. -D_GNU_SOURCE -pthread
 
 PERF_EVENT_HDR=$(TOPDIR)/include/perfmon/pfmlib_perf_event.h
@@ -55,7 +50,7 @@ TARGETS+=self self_basic self_count task task_attach_timeout syst \
 	notify_self notify_group task_smpl self_smpl_multi \
 	self_pipe syst_count task_cpu syst_smpl evt2raw
 
-EXAMPLESDIR=$(DOCDIR)/perf_examples
+EXAMPLESDIR=$(DESTDIR)$(DOCDIR)/perf_examples
 
 all: $(TARGETS)
 	@set -e ; for d in $(DIRS) ; do $(MAKE) -C $$d $@ ; done

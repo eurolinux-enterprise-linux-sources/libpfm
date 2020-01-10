@@ -65,7 +65,7 @@ static uint64_t collected_samples, lost_samples;
 static perf_event_desc_t *fds;
 static int num_fds;
 static options_t options;
-static size_t sz, pgsz;
+static size_t pgsz;
 static size_t map_size;
 
 static struct option the_options[]={
@@ -116,7 +116,6 @@ process_smpl_buf(perf_event_desc_t *hw)
 int
 setup_cpu(int cpu, int fd)
 {
-	uint64_t *val;
 	int ret, flags;
 	int i, pid;
 
@@ -156,11 +155,15 @@ setup_cpu(int cpu, int fd)
 			}
 
 			fds[i].hw.sample_type = PERF_SAMPLE_IP|PERF_SAMPLE_TID|PERF_SAMPLE_READ|PERF_SAMPLE_TIME|PERF_SAMPLE_PERIOD|PERF_SAMPLE_STREAM_ID|PERF_SAMPLE_CPU;
+			/*
+			 * if we have more than one event, then record event identifier to help with parsing
+			 */
+			if (num_fds > 1)
+				fds[i].hw.sample_type |= PERF_SAMPLE_IDENTIFIER;
+
 			printf("%s period=%"PRIu64" freq=%d\n", fds[i].name, fds[i].hw.sample_period, fds[i].hw.freq);
 
 			fds[i].hw.read_format = PERF_FORMAT_SCALE;
-			if (num_fds > 1)
-				fds[i].hw.read_format |= PERF_FORMAT_GROUP|PERF_FORMAT_ID;
 
 			if (fds[i].hw.freq)
 				fds[i].hw.sample_type |= PERF_SAMPLE_PERIOD;
@@ -196,36 +199,19 @@ setup_cpu(int cpu, int fd)
 	}
 
 	/*
-	 * we are using PERF_FORMAT_GROUP, therefore the structure
-	 * of val is as follows:
-	 *
-	 *      { u64           nr;
-	 *        { u64         time_enabled; } && PERF_FORMAT_ENABLED
-	 *        { u64         time_running; } && PERF_FORMAT_RUNNING
-	 *        { u64         value;
-	 *          { u64       id;           } && PERF_FORMAT_ID
-	 *        }             cntr[nr];
-	 *      }
-	 * We are skipping the first 3 values (nr, time_enabled, time_running)
-	 * and then for each event we get a pair of values.
+	 * collect event ids
 	 */
 	if (num_fds > 1 && fds[0].fd > -1) {
-		ssize_t sret;
-
-		sz = (3+2*num_fds)*sizeof(uint64_t);
-		val = malloc(sz);
-		if (!val)
-			err(1, "cannot allocated memory");
-
-		sret = read(fds[0].fd, val, sz);
-		if (sret == (ssize_t)sz)
-			err(1, "cannot read id %zu", sizeof(val));
-
-		for(i=0; i < num_fds; i++) {
-			fds[i].id = val[2*i+1+3];
-			printf("%"PRIu64"  %s\n", fds[i].id, fds[i].name);
+		for(i = 0; i < num_fds; i++) {
+			/*
+			 * read the event identifier using ioctl
+			 * new method replaced the trick with PERF_FORMAT_GROUP + PERF_FORMAT_ID + read()
+			 */
+			ret = ioctl(fds[i].fd, PERF_EVENT_IOC_ID, &fds[i].id);
+			if (ret == -1)
+				err(1, "cannot read ID");
+			printf("ID %"PRIu64"  %s\n", fds[i].id, fds[i].name);
 		}
-		free(val);
 	}
 	return 0;
 }
@@ -240,50 +226,70 @@ start_cpu(void)
 		err(1, "cannot start counter");
 }
 
-static const char
-*cgroupfs_find_mountpoint(void)
+static int
+cgroupfs_find_mountpoint(char *buf, size_t maxlen)
 {
-	static char cgroup_mountpoint[MAX_PATH+1];
 	FILE *fp;
+	char mountpoint[MAX_PATH+1], tokens[MAX_PATH+1], type[MAX_PATH+1];
+	char *token, *saved_ptr = NULL;
 	int found = 0;
-	char type[64];
 
 	fp = fopen("/proc/mounts", "r");
 	if (!fp)
-		return NULL;
+		return -1;
 
-	while (fscanf(fp, "%*s %"
-				STR(MAX_PATH)
-				"s %99s %*s %*d %*d\n",
-				cgroup_mountpoint, type) == 2) {
+	/*
+	 * in order to handle split hierarchy, we need to scan /proc/mounts
+	 * and inspect every cgroupfs mount point to find one that has
+	 * perf_event subsystem
+	 */
+	while (fscanf(fp, "%*s %"STR(MAX_PATH)"s %"STR(MAX_PATH)"s %"
+				STR(MAX_PATH)"s %*d %*d\n",
+				mountpoint, type, tokens) == 3) {
 
-		found = !strcmp(type, "cgroup");
+		if (!strcmp(type, "cgroup")) {
+
+			token = strtok_r(tokens, ",", &saved_ptr);
+
+			while (token != NULL) {
+				if (!strcmp(token, "perf_event")) {
+					found = 1;
+					break;
+				}
+				token = strtok_r(NULL, ",", &saved_ptr);
+			}
+		}
 		if (found)
 			break;
 	}
 	fclose(fp);
+	if (!found)
+		return -1;
 
-	return found ? cgroup_mountpoint : NULL;
+	if (strlen(mountpoint) < maxlen) {
+		strcpy(buf, mountpoint);
+		return 0;
+	}
+	return -1;
 }
 
 int
 open_cgroup(char *name)
 {
-	char path[MAX_PATH+1];
-	const char *mnt;
-	int cfd;
+        char path[MAX_PATH+1];
+        char mnt[MAX_PATH+1];
+        int cfd;
 
-	mnt = cgroupfs_find_mountpoint();
-	if (!mnt)
-		errx(1, "cannot find cgroup fs mount point");
+        if (cgroupfs_find_mountpoint(mnt, MAX_PATH+1))
+                errx(1, "cannot find cgroup fs mount point");
 
-	snprintf(path, MAX_PATH, "%s/%s", mnt, name);
+        snprintf(path, MAX_PATH, "%s/%s", mnt, name);
 
-	cfd = open(path, O_RDONLY);
-	if (cfd == -1)
-		warn("no access to cgroup %s\n", name);
+        cfd = open(path, O_RDONLY);
+        if (cfd == -1)
+                warn("no access to cgroup %s\n", name);
 
-	return cfd;
+        return cfd;
 }
 
 static void handler(int n)

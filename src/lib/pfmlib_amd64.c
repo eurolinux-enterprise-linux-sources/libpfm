@@ -112,10 +112,14 @@ amd64_get_revision(pfm_amd64_config_t *cfg)
         if (cfg->family == 15) {
                 switch (cfg->model >> 4) {
                 case 0:
-                        if (cfg->model == 5 && cfg->stepping < 2)
+                        if (cfg->model == 5 && cfg->stepping < 2) {
                                 rev = PFM_PMU_AMD64_K8_REVB;
-                        if (cfg->model == 4 && cfg->stepping == 0)
+				break;
+                        }
+                        if (cfg->model == 4 && cfg->stepping == 0) {
                                 rev = PFM_PMU_AMD64_K8_REVB;
+				break;
+                        }
                         rev = PFM_PMU_AMD64_K8_REVC;
 			break;
                 case 1:
@@ -341,6 +345,20 @@ pfm_amd64_detect(void *this)
 		return PFM_ERR_NOTSUPP;
 
 	return PFM_SUCCESS;
+}
+
+int
+pfm_amd64_family_detect(void *this)
+{
+	struct pfmlib_pmu *pmu = this;
+	int ret;
+
+	ret = pfm_amd64_detect(this);
+	if (ret != PFM_SUCCESS)
+		return ret;
+
+	ret = pfm_amd64_cfg.revision;
+	return ret == pmu->cpu_family ? PFM_SUCCESS : PFM_ERR_NOTSUPP;
 }
 
 static int

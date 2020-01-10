@@ -190,6 +190,110 @@ typedef enum {
 	PFM_PMU_INTEL_IVB_UNC_CB2,	/* Intel IvyBridge C-box 2 uncore PMU */
 	PFM_PMU_INTEL_IVB_UNC_CB3,	/* Intel IvyBridge C-box 3 uncore PMU */
 
+	PFM_PMU_POWER8,			/* IBM POWER8 */
+	PFM_PMU_INTEL_RAPL,		/* Intel RAPL */
+
+	PFM_PMU_INTEL_SLM,		/* Intel Silvermont */
+	PFM_PMU_AMD64_FAM15H_NB,	/* AMD AMD64 Fam15h NorthBridge */
+
+	PFM_PMU_ARM_QCOM_KRAIT,		/* Qualcomm Krait */
+	PFM_PMU_PERF_EVENT_RAW,		/* perf_events RAW event syntax */
+
+	PFM_PMU_INTEL_IVBEP_UNC_CB0,	/* Intel IvyBridge-EP C-Box core 0 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB1,	/* Intel IvyBridge-EP C-Box core 1 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB2,	/* Intel IvyBridge-EP C-Box core 2 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB3,	/* Intel IvyBridge-EP C-Box core 3 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB4,	/* Intel IvyBridge-EP C-Box core 4 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB5,	/* Intel IvyBridge-EP C-Box core 5 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB6,	/* Intel IvyBridge-EP C-Box core 6 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB7,	/* Intel IvyBridge-EP C-Box core 7 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB8,	/* Intel IvyBridge-EP C-Box core 8 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB9,	/* Intel IvyBridge-EP C-Box core 9 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB10,	/* Intel IvyBridge-EP C-Box core 10 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB11,	/* Intel IvyBridge-EP C-Box core 11 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB12,	/* Intel IvyBridge-EP C-Box core 12 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB13,	/* Intel IvyBridge-EP C-Box core 13 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_CB14,	/* Intel IvyBridge-EP C-Box core 14 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_HA0,	/* Intel IvyBridge-EP HA 0 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_HA1,	/* Intel IvyBridge-EP HA 1 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IMC0,	/* Intel IvyBridge-EP IMC socket 0 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IMC1,	/* Intel IvyBridge-EP IMC socket 1 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IMC2,	/* Intel IvyBridge-EP IMC socket 2 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IMC3,	/* Intel IvyBridge-EP IMC socket 3 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IMC4,	/* Intel IvyBridge-EP IMC socket 4 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IMC5,	/* Intel IvyBridge-EP IMC socket 5 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IMC6,	/* Intel IvyBridge-EP IMC socket 6 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IMC7,	/* Intel IvyBridge-EP IMC socket 7 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_PCU,	/* Intel IvyBridge-EP PCU uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_QPI0,	/* Intel IvyBridge-EP QPI link 0 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_QPI1,	/* Intel IvyBridge-EP QPI link 1 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_QPI2,	/* Intel IvyBridge-EP QPI link 2 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_UBOX,	/* Intel IvyBridge-EP U-Box uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_R2PCIE,	/* Intel IvyBridge-EP R2PCIe uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_R3QPI0,	/* Intel IvyBridge-EP R3QPI 0 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_R3QPI1,	/* Intel IvyBridge-EP R3QPI 1 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_R3QPI2,	/* Intel IvyBridge-EP R3QPI 2 uncore */
+	PFM_PMU_INTEL_IVBEP_UNC_IRP,	/* Intel IvyBridge-EP IRP uncore */
+
+	PFM_PMU_S390X_CPUM_SF,		/* s390x: CPU-M sampling facility */
+
+	PFM_PMU_ARM_CORTEX_A57,		/* ARM Cortex A57 (ARMv8) */
+	PFM_PMU_ARM_CORTEX_A53,		/* ARM Cortex A53 (ARMv8) */
+
+	PFM_PMU_ARM_CORTEX_A7,		/* ARM Cortex A7 */
+
+	PFM_PMU_INTEL_HSW_EP,		/* Intel Haswell EP */
+	PFM_PMU_INTEL_BDW,		/* Intel Broadwell EP */
+
+	PFM_PMU_ARM_XGENE,		/* Applied Micro X-Gene (ARMv8) */
+
+	PFM_PMU_INTEL_HSWEP_UNC_CB0,	/* Intel Haswell-EP C-Box core 0 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB1,	/* Intel Haswell-EP C-Box core 1 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB2,	/* Intel Haswell-EP C-Box core 2 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB3,	/* Intel Haswell-EP C-Box core 3 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB4,	/* Intel Haswell-EP C-Box core 4 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB5,	/* Intel Haswell-EP C-Box core 5 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB6,	/* Intel Haswell-EP C-Box core 6 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB7,	/* Intel Haswell-EP C-Box core 7 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB8,	/* Intel Haswell-EP C-Box core 8 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB9,	/* Intel Haswell-EP C-Box core 9 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB10,	/* Intel Haswell-EP C-Box core 10 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB11,	/* Intel Haswell-EP C-Box core 11 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB12,	/* Intel Haswell-EP C-Box core 12 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB13,	/* Intel Haswell-EP C-Box core 13 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB14,	/* Intel Haswell-EP C-Box core 14 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB15,	/* Intel Haswell-EP C-Box core 15 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB16,	/* Intel Haswell-EP C-Box core 16 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_CB17,	/* Intel Haswell-EP C-Box core 17 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_HA0,	/* Intel Haswell-EP HA 0 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_HA1,	/* Intel Haswell-EP HA 1 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IMC0,	/* Intel Haswell-EP IMC socket 0 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IMC1,	/* Intel Haswell-EP IMC socket 1 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IMC2,	/* Intel Haswell-EP IMC socket 2 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IMC3,	/* Intel Haswell-EP IMC socket 3 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IMC4,	/* Intel Haswell-EP IMC socket 4 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IMC5,	/* Intel Haswell-EP IMC socket 5 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IMC6,	/* Intel Haswell-EP IMC socket 6 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IMC7,	/* Intel Haswell-EP IMC socket 7 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_PCU,	/* Intel Haswell-EP PCU uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_QPI0,	/* Intel Haswell-EP QPI link 0 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_QPI1,	/* Intel Haswell-EP QPI link 1 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_UBOX,	/* Intel Haswell-EP U-Box uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_R2PCIE,	/* Intel Haswell-EP R2PCIe uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_R3QPI0,	/* Intel Haswell-EP R3QPI 0 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_R3QPI1,	/* Intel Haswell-EP R3QPI 1 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_R3QPI2,	/* Intel Haswell-EP R3QPI 2 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_IRP,	/* Intel Haswell-EP IRP uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_SB0,	/* Intel Haswell-EP S-Box 0 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_SB1,	/* Intel Haswell-EP S-Box 1 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_SB2,	/* Intel Haswell-EP S-Box 2 uncore */
+	PFM_PMU_INTEL_HSWEP_UNC_SB3,	/* Intel Haswell-EP S-Box 3 uncore */
+
+	PFM_PMU_POWERPC_NEST_MCS_READ_BW,   /* POWERPC Nest Memory Read bandwidth */
+	PFM_PMU_POWERPC_NEST_MCS_WRITE_BW,  /* POWERPC Nest Memory Write bandwidth */
+
+	PFM_PMU_INTEL_SKL,		/* Intel Skylake */
+
 	/* MUST ADD NEW PMU MODELS HERE */
 
 	PFM_PMU_MAX			/* end marker */

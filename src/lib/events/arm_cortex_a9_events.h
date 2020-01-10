@@ -82,11 +82,11 @@ static const arm_entry_t arm_cortex_a9_pe []={
 	},
 	{.name = "PC_WRITE",
 	 .code = 0x0c,
-	 .desc = "Software change of PC.  Equivelant to branches"
+	 .desc = "Software change of PC.  Equivalent to branches"
 	},
 	{.name = "PC_IMM_BRANCH",
 	 .code = 0x0d,
-	 .desc = "Immedidate branches architecturally executed"
+	 .desc = "Immediate branches architecturally executed"
 	},
 	{.name = "UNALIGNED_ACCESS",
 	 .code = 0x0f,

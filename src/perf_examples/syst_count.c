@@ -37,7 +37,7 @@
 
 #include "perf_util.h"
 
-#define MAX_GROUPS	16
+#define MAX_GROUPS	256
 #define MAX_PATH	1024
 
 #ifndef STR
@@ -182,17 +182,10 @@ setup_cpu(int cpu, int cfd)
 				if (errno == EACCES)
 					err(1, "you need to be root to run system-wide on this machine");
 
-				warn("cannot attach event %s to CPU%ds, skipping it", fds[j].name, cpu);
-				goto error;
+				warn("cannot attach event %s to CPU%ds, aborting", fds[j].name, cpu);
+				exit(1);
 			}
 		}
-	}
-	return;
-error:
-	for (i=0; i < j; i++) {
-		if (fds[i].fd > -1)
-			close(fds[i].fd);
-		fds[i].fd = -1;
 	}
 }
 
@@ -350,8 +343,8 @@ measure(void)
 
 		for (delay = 1 ; delay <= options.delay; delay++) {
 
-		for(c=cmin ; c < cmax; c++)
-			start_cpu(c);
+			for(c=cmin ; c < cmax; c++)
+				start_cpu(c);
 
 			if (0) {
 				tv.tv_sec = 0;
@@ -360,8 +353,8 @@ measure(void)
 			} else
 				sleep(1);
 
-		for(c=cmin ; c < cmax; c++)
-			stop_cpu(c);
+			for(c=cmin ; c < cmax; c++)
+				stop_cpu(c);
 
 			for(c = cmin; c < cmax; c++) {
 				printf("# %'ds -----\n", delay);

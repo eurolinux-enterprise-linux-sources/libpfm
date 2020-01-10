@@ -25,49 +25,16 @@
 #include "pfmlib_priv.h"
 #include "pfmlib_intel_x86_priv.h"
 #include "events/intel_snb_events.h"
-#include "events/intel_snbep_events.h"
 
-static int
-pfm_snb_detect(void *this)
-{
-	int ret;
+static const int snb_models[] = {
+	42, /* Sandy Bridge (Core i7 26xx, 25xx) */
+	0
+};
 
-	ret = pfm_intel_x86_detect();
-	if (ret != PFM_SUCCESS)
-		return ret;
-
-	if (pfm_intel_x86_cfg.family != 6)
-		return PFM_ERR_NOTSUPP;
-
-	switch (pfm_intel_x86_cfg.model) {
-		case 42: /* Sandy Bridge (Core i7 26xx, 25xx) */
-			break;
-		default:
-			return PFM_ERR_NOTSUPP;
-	}
-	return PFM_SUCCESS;
-}
-
-static int
-pfm_snb_ep_detect(void *this)
-{
-	int ret;
-
-	ret = pfm_intel_x86_detect();
-	if (ret != PFM_SUCCESS)
-		return ret;
-
-	if (pfm_intel_x86_cfg.family != 6)
-		return PFM_ERR_NOTSUPP;
-
-	switch (pfm_intel_x86_cfg.model) {
-		case 45: /* Sandy Bridge EP */
-			break;
-		default:
-			return PFM_ERR_NOTSUPP;
-	}
-	return PFM_SUCCESS;
-}
+static const int snb_ep_models[] = {
+	45, /* Sandy Bridge EP */
+	0
+};
 
 static int
 pfm_snb_init(void *this)
@@ -90,7 +57,9 @@ pfmlib_pmu_t intel_snb_support={
 	.atdesc			= intel_x86_mods,
 	.flags			= PFMLIB_PMU_FL_RAW_UMASK
 				| INTEL_X86_PMU_FL_ECMASK,
-	.pmu_detect		= pfm_snb_detect,
+	.cpu_family		= 6,
+	.cpu_models		= snb_models,
+	.pmu_detect		= pfm_intel_x86_model_detect,
 	.pmu_init		= pfm_snb_init,
 	.get_event_encoding[PFM_OS_NONE] = pfm_intel_x86_get_encoding,
 	 PFMLIB_ENCODE_PERF(pfm_intel_x86_get_perf_encoding),
@@ -109,17 +78,19 @@ pfmlib_pmu_t intel_snb_ep_support={
 	.desc			= "Intel Sandy Bridge EP",
 	.name			= "snb_ep",
 	.pmu			= PFM_PMU_INTEL_SNB_EP,
-	.pme_count		= LIBPFM_ARRAY_SIZE(intel_snbep_pe),
+	.pme_count		= LIBPFM_ARRAY_SIZE(intel_snb_pe),
 	.type			= PFM_PMU_TYPE_CORE,
 	.supported_plm		= INTEL_X86_PLM,
 	.num_cntrs		= 8, /* consider with HT off by default */
 	.num_fixed_cntrs	= 3,
 	.max_encoding		= 2, /* offcore_response */
-	.pe			= intel_snbep_pe,
+	.pe			= intel_snb_pe,
 	.atdesc			= intel_x86_mods,
 	.flags			= PFMLIB_PMU_FL_RAW_UMASK
 				| INTEL_X86_PMU_FL_ECMASK,
-	.pmu_detect		= pfm_snb_ep_detect,
+	.cpu_family		= 6,
+	.cpu_models		= snb_ep_models,
+	.pmu_detect		= pfm_intel_x86_model_detect,
 	.pmu_init		= pfm_snb_init,
 	.get_event_encoding[PFM_OS_NONE] = pfm_intel_x86_get_encoding,
 	 PFMLIB_ENCODE_PERF(pfm_intel_x86_get_perf_encoding),

@@ -97,6 +97,7 @@ perf_setup_argv_events(const char **argv, perf_event_desc_t **fds, int *num_fds)
 		fd[num].name = strdup(*argv);
 		fd[num].group_leader = group_leader;
 		fd[num].idx = arg.idx;
+		fd[num].cpu = arg.cpu;
 
 		num++;
 		argv++;
@@ -238,7 +239,7 @@ perf_read_buffer(perf_event_desc_t *hw, void *buf, size_t sz)
 	/*
 	 * copy wrapped around leftover
 	 */
-	if ((sz - m) > 0)
+	if (sz > m)
 		memcpy(buf+m, data, sz - m);
 
 	//printf("\nhead=%lx tail=%lx new_tail=%lx sz=%zu\n", hdr->data_head, hdr->data_tail, hdr->data_tail+sz, sz);
@@ -339,6 +340,14 @@ perf_display_branch_stack(perf_event_desc_t *desc, FILE *fp)
 static int
 perf_display_regs_user(perf_event_desc_t *hw, FILE *fp)
 {
+	errx(1, "display regs_user not implemented yet\n");
+	return 0;
+}
+
+static int
+perf_display_regs_intr(perf_event_desc_t *hw, FILE *fp)
+{
+	errx(1, "display regs_intr not implemented yet\n");
 	return 0;
 }
 
@@ -350,7 +359,7 @@ perf_display_stack_user(perf_event_desc_t *hw, FILE *fp)
 	size_t sz;
 	int ret;
 
-	ret = perf_read_buffer(hw, &nr, sizeof(hw));
+	ret = perf_read_buffer(hw, &nr, sizeof(nr));
 	if (ret)
 		errx(1, "cannot user stack size");
 
@@ -394,6 +403,15 @@ perf_display_sample(perf_event_desc_t *fds, int num_fds, int idx, struct perf_ev
 	type = hw->hw.sample_type;
 	fmt  = hw->hw.read_format;
 
+	if (type & PERF_SAMPLE_IDENTIFIER) {
+		ret = perf_read_buffer_64(hw, &val64);
+		if (ret) {
+			warnx("cannot read IP");
+			return -1;
+		}
+		fprintf(fp, "ID:%"PRIu64" ", val64);
+		sz -= sizeof(val64);
+	}
 	/*
 	 * the sample_type information is laid down
 	 * based on the PERF_RECORD_SAMPLE format specified
@@ -695,6 +713,20 @@ perf_display_sample(perf_event_desc_t *fds, int num_fds, int idx, struct perf_ev
 		}
 		fprintf(fp, "DATA_SRC:%'"PRIu64" ", val64);
 		sz -= sizeof(val64);
+	}
+	if (type & PERF_SAMPLE_TRANSACTION) {
+		ret = perf_read_buffer_64(hw, &val64);
+		if (ret) {
+			warnx( "cannot read txn");
+			return -1;
+		}
+		fprintf(fp, "TXN:%'"PRIu64" ", val64);
+		sz -= sizeof(val64);
+	}
+
+	if (type & PERF_SAMPLE_REGS_INTR) {
+		ret = perf_display_regs_intr(hw, fp);
+		sz -= ret;
 	}
 
 	/*

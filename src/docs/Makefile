@@ -28,6 +28,7 @@ include $(TOPDIR)/rules.mk
 .PHONY: all clean distclean depend
 
 ARCH_MAN=
+SYS_MAN=
 
 ifeq ($(CONFIG_PFMLIB_ARCH_X86),y)
 ARCH_MAN=libpfm_intel_core.3	\
@@ -36,6 +37,7 @@ ARCH_MAN=libpfm_intel_core.3	\
 	 libpfm_amd64_k7.3	\
 	 libpfm_amd64_k8.3	\
 	 libpfm_amd64_fam10h.3	\
+	 libpfm_amd64_fam15h.3	\
 	 libpfm_intel_atom.3	\
 	 libpfm_intel_nhm.3	\
 	 libpfm_intel_nhm_unc.3 \
@@ -46,6 +48,10 @@ ARCH_MAN=libpfm_intel_core.3	\
 	 libpfm_intel_ivb.3	\
 	 libpfm_intel_ivb_unc.3 \
 	 libpfm_intel_hsw.3	\
+	 libpfm_intel_bdw.3	\
+	 libpfm_intel_rapl.3	\
+	 libpfm_intel_slm.3	\
+	 libpfm_intel_skl.3	\
 	 libpfm_intel_snbep_unc_cbo.3 \
 	 libpfm_intel_snbep_unc_ha.3 \
 	 libpfm_intel_snbep_unc_imc.3 \
@@ -54,7 +60,26 @@ ARCH_MAN=libpfm_intel_core.3	\
 	 libpfm_intel_snbep_unc_ubo.3 \
 	 libpfm_intel_snbep_unc_r2pcie.3 \
 	 libpfm_intel_snbep_unc_r3qpi.3 \
-	 libpfm_intel_knc.3
+	 libpfm_intel_ivbep_unc_cbo.3 \
+	 libpfm_intel_ivbep_unc_ha.3 \
+	 libpfm_intel_ivbep_unc_imc.3 \
+	 libpfm_intel_ivbep_unc_pcu.3 \
+	 libpfm_intel_ivbep_unc_qpi.3 \
+	 libpfm_intel_ivbep_unc_ubo.3 \
+	 libpfm_intel_ivbep_unc_r2pcie.3 \
+	 libpfm_intel_ivbep_unc_r3qpi.3 \
+	 libpfm_intel_ivbep_unc_irp.3 \
+	 libpfm_intel_knc.3 \
+	 libpfm_intel_hswep_unc_cbo.3 \
+	 libpfm_intel_hswep_unc_ha.3 \
+	 libpfm_intel_hswep_unc_imc.3 \
+	 libpfm_intel_hswep_unc_irp.3 \
+	 libpfm_intel_hswep_unc_pcu.3 \
+	 libpfm_intel_hswep_unc_qpi.3 \
+	 libpfm_intel_hswep_unc_r2pcie.3 \
+	 libpfm_intel_hswep_unc_r3qpi.3 \
+	 libpfm_intel_hswep_unc_sbo.3 \
+	 libpfm_intel_hswep_unc_ubo.3
 
 ifeq ($(CONFIG_PFMLIB_ARCH_I386),y)
 ARCH_MAN += libpfm_intel_p6.3 libpfm_intel_coreduo.3
@@ -63,9 +88,21 @@ endif
 endif
 
 ifeq ($(CONFIG_PFMLIB_ARCH_ARM),y)
-ARCH_MAN += libpfm_arm_ac15.3 libpfm_arm_ac8.3 libpfm_arm_ac9.3
+ARCH_MAN += libpfm_arm_xgene.3 \
+	    libpfm_arm_ac7.3 \
+	    libpfm_arm_ac57.3 \
+	    libpfm_arm_ac53.3 \
+	    libpfm_arm_ac15.3 \
+	    libpfm_arm_ac8.3 \
+	    libpfm_arm_ac9.3 \
+	    libpfm_arm_qcom_krait.3
 endif
 
+ifeq ($(CONFIG_PFMLIB_ARCH_ARM64),y)
+ARCH_MAN += libpfm_arm_xgene.3 \
+	    libpfm_arm_ac57.3 \
+	    libpfm_arm_ac53.3
+endif
 
 ifeq ($(CONFIG_PFMLIB_ARCH_MIPS),y)
 ARCH_MAN += libpfm_mips_74k.3
@@ -78,14 +115,17 @@ GEN_MAN= libpfm.3 \
 	pfm_get_event_encoding.3 \
 	pfm_get_event_next.3 \
 	pfm_get_pmu_info.3 \
-	pfm_get_perf_event_encoding.3 \
 	pfm_get_os_event_encoding.3 \
 	pfm_get_version.3 \
 	pfm_initialize.3 \
 	pfm_terminate.3 \
 	pfm_strerror.3
 
-MAN=$(GEN_MAN) $(ARCH_MAN)
+ifeq ($(SYS),Linux)
+SYS_MAN=pfm_get_perf_event_encoding.3 libpfm_perf_event_raw.3
+endif
+
+MAN=$(GEN_MAN) $(ARCH_MAN) $(SYS_MAN)
 
 install:
 

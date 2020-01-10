@@ -30,7 +30,7 @@ include $(TOPDIR)/rules.mk
 SRCS=pfmlib_common.c
 
 ifeq ($(SYS),Linux)
-SRCS += pfmlib_perf_event_pmu.c pfmlib_perf_event.c
+SRCS += pfmlib_perf_event_pmu.c pfmlib_perf_event.c pfmlib_perf_event_raw.c
 endif
 
 CFLAGS+=-D_REENTRANT -I.
@@ -60,6 +60,9 @@ SRCS   += pfmlib_amd64.c pfmlib_intel_core.c pfmlib_intel_x86.c \
 	  pfmlib_intel_snb.c pfmlib_intel_snb_unc.c \
 	  pfmlib_intel_ivb.c pfmlib_intel_ivb_unc.c \
 	  pfmlib_intel_hsw.c \
+	  pfmlib_intel_bdw.c \
+	  pfmlib_intel_skl.c \
+	  pfmlib_intel_rapl.c \
 	  pfmlib_intel_snbep_unc.c \
 	  pfmlib_intel_snbep_unc_cbo.c \
 	  pfmlib_intel_snbep_unc_ha.c \
@@ -69,7 +72,27 @@ SRCS   += pfmlib_amd64.c pfmlib_intel_core.c pfmlib_intel_x86.c \
 	  pfmlib_intel_snbep_unc_ubo.c \
 	  pfmlib_intel_snbep_unc_r2pcie.c \
 	  pfmlib_intel_snbep_unc_r3qpi.c \
+	  pfmlib_intel_ivbep_unc_cbo.c \
+	  pfmlib_intel_ivbep_unc_ha.c \
+	  pfmlib_intel_ivbep_unc_imc.c \
+	  pfmlib_intel_ivbep_unc_pcu.c \
+	  pfmlib_intel_ivbep_unc_qpi.c \
+	  pfmlib_intel_ivbep_unc_ubo.c \
+	  pfmlib_intel_ivbep_unc_r2pcie.c \
+	  pfmlib_intel_ivbep_unc_r3qpi.c \
+	  pfmlib_intel_ivbep_unc_irp.c \
+	  pfmlib_intel_hswep_unc_cbo.c \
+	  pfmlib_intel_hswep_unc_ha.c \
+	  pfmlib_intel_hswep_unc_imc.c \
+	  pfmlib_intel_hswep_unc_pcu.c \
+	  pfmlib_intel_hswep_unc_qpi.c \
+	  pfmlib_intel_hswep_unc_ubo.c \
+	  pfmlib_intel_hswep_unc_r2pcie.c \
+	  pfmlib_intel_hswep_unc_r3qpi.c \
+	  pfmlib_intel_hswep_unc_irp.c \
+	  pfmlib_intel_hswep_unc_sbo.c \
 	  pfmlib_intel_knc.c \
+	  pfmlib_intel_slm.c \
 	  pfmlib_intel_netburst.c \
 	  pfmlib_amd64_k7.c pfmlib_amd64_k8.c pfmlib_amd64_fam10h.c \
 	  pfmlib_amd64_fam11h.c pfmlib_amd64_fam12h.c \
@@ -95,7 +118,7 @@ SRCS += pfmlib_powerpc_perf_event.c
 endif
 
 INCARCH = $(INC_POWERPC)
-SRCS   += pfmlib_powerpc.c pfmlib_power4.c pfmlib_ppc970.c pfmlib_power5.c pfmlib_power6.c pfmlib_power7.c pfmlib_torrent.c
+SRCS   += pfmlib_powerpc.c pfmlib_power4.c pfmlib_ppc970.c pfmlib_power5.c pfmlib_power6.c pfmlib_power7.c pfmlib_torrent.c pfmlib_power8.c pfmlib_powerpc_nest.c
 CFLAGS += -DCONFIG_PFMLIB_ARCH_POWERPC
 endif
 
@@ -128,8 +151,19 @@ SRCS += pfmlib_arm_perf_event.c
 endif
 
 INCARCH = $(INC_ARM)
-SRCS   += pfmlib_arm.c pfmlib_arm_armv7_pmuv1.c pfmlib_arm_armv6.c
+SRCS   += pfmlib_arm.c pfmlib_arm_armv7_pmuv1.c pfmlib_arm_armv6.c pfmlib_arm_armv8.c
 CFLAGS += -DCONFIG_PFMLIB_ARCH_ARM
+endif
+
+ifeq ($(CONFIG_PFMLIB_ARCH_ARM64),y)
+
+ifeq ($(SYS),Linux)
+SRCS += pfmlib_arm_perf_event.c
+endif
+
+INCARCH = $(INC_ARM64)
+SRCS   += pfmlib_arm.c pfmlib_arm_armv8.c
+CFLAGS += -DCONFIG_PFMLIB_ARCH_ARM64
 endif
 
 ifeq ($(CONFIG_PFMLIB_ARCH_MIPS),y)
@@ -143,10 +177,6 @@ SRCS   += pfmlib_mips.c pfmlib_mips_74k.c
 CFLAGS += -DCONFIG_PFMLIB_ARCH_MIPS
 endif
 
-ifeq ($(CONFIG_PFMLIB_ARCH_CRAYXT),y)
-CFLAGS += -DCONFIG_PFMLIB_ARCH_CRAYXT
-endif
-
 ifeq ($(CONFIG_PFMLIB_CELL),y)
 INCARCH = $(INC_CELL)
 #SRCS   += pfmlib_cell.c
@@ -154,7 +184,7 @@ CFLAGS += -DCONFIG_PFMLIB_CELL
 endif
 
 ifeq ($(SYS),Linux)
-SLDFLAGS=-shared -Wl,-soname -Wl,$(VLIBPFM)
+SLDFLAGS=$(LDFLAGS) -shared -Wl,-soname -Wl,$(VLIBPFM)
 SLIBPFM=libpfm.so.$(VERSION).$(REVISION).$(AGE)
 VLIBPFM=libpfm.so.$(VERSION)
 SOLIBEXT=so
@@ -203,10 +233,11 @@ INC_X86= pfmlib_intel_x86_priv.h	\
 	events/intel_wsm_events.h	\
 	events/intel_wsm_unc_events.h	\
 	events/intel_snb_events.h	\
-	events/intel_snbep_events.h	\
 	events/intel_snb_unc_events.h	\
 	events/intel_ivb_events.h	\
 	events/intel_hsw_events.h	\
+	events/intel_bdw_events.h	\
+	events/intel_skl_events.h	\
 	pfmlib_intel_snbep_unc_priv.h	\
 	events/intel_snbep_unc_cbo_events.h \
 	events/intel_snbep_unc_ha_events.h \
@@ -216,7 +247,27 @@ INC_X86= pfmlib_intel_x86_priv.h	\
 	events/intel_snbep_unc_ubo_events.h \
 	events/intel_snbep_unc_r2pcie_events.h \
 	events/intel_snbep_unc_r3qpi_events.h \
-	events/intel_knc_events.h
+	events/intel_knc_events.h \
+	events/intel_ivbep_unc_cbo_events.h \
+	events/intel_ivbep_unc_ha_events.h \
+	events/intel_ivbep_unc_imc_events.h \
+	events/intel_ivbep_unc_pcu_events.h \
+	events/intel_ivbep_unc_qpi_events.h \
+	events/intel_ivbep_unc_ubo_events.h \
+	events/intel_ivbep_unc_r2pcie_events.h \
+	events/intel_ivbep_unc_r3qpi_events.h \
+	events/intel_ivbep_unc_irp_events.h \
+	events/intel_hswep_unc_cbo_events.h \
+	events/intel_hswep_unc_sbo_events.h \
+	events/intel_hswep_unc_ha_events.h \
+	events/intel_hswep_unc_imc_events.h \
+	events/intel_hswep_unc_pcu_events.h \
+	events/intel_hswep_unc_qpi_events.h \
+	events/intel_hswep_unc_ubo_events.h \
+	events/intel_hswep_unc_r2pcie_events.h \
+	events/intel_hswep_unc_r3qpi_events.h \
+	events/intel_hswep_unc_irp_events.h \
+	events/intel_slm_events.h
 
 INC_MIPS=events/mips_74k_events.h events/mips_74k_events.h
 
@@ -227,7 +278,9 @@ INC_POWERPC=events/ppc970_events.h	\
 	events/power5+_events.h		\
 	events/power6_events.h		\
 	events/power7_events.h		\
-	events/torrent_events.h
+	events/power8_events.h		\
+	events/torrent_events.h		\
+	events/powerpc_nest_events.h
 
 INC_S390X=pfmlib_s390x_priv.h \
 	events/s390x_cpumf_events.h
@@ -243,12 +296,19 @@ INC_SPARC=events/sparc_ultra12_events.h		\
 INC_CELL=events/cell_events.h
 
 INC_ARM=events/arm_cortex_a8_events.h		\
-        events/arm_cortex_a9_events.h
+        events/arm_cortex_a9_events.h		\
+        events/arm_arm_xgene_events.h
 
 INC_ARM=pfmlib_arm_priv.h			\
+	events/arm_cortex_a7_events.h		\
 	events/arm_cortex_a8_events.h		\
 	events/arm_cortex_a9_events.h		\
-	events/arm_cortex_a15_events.h
+	events/arm_cortex_a15_events.h		\
+	events/arm_cortex_a57_events.h		\
+	events/arm_cortex_a53_events.h
+
+INC_ARM64=events/arm_cortex_a57_events.h	\
+	  events/arm_cortex_a53_events.h
 
 INCDEP=$(INC_COMMON) $(INCARCH)
 

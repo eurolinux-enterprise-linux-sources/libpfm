@@ -1,3 +1,40 @@
+libpfm4 (7.0) unstable; urgency=low
+  * add Intel Skylake support
+  * add Intel Haswell-EP uncore PMU support
+  * add Broadwell DE support
+  * updated most Intel x86 event tables to match official tables
+  * refreshed perf_event.h header to 4.2
+  * more bug fixes and minor updates
+
+ -- Stephane Eranian <eranian@gmail.com>  Thu, 11 Feb  2016 16:56:01 +0200
+
+libpfm4 (6.0) unstable; urgency=low
+  * add Intel Broadwell (desktop) support
+  * add Intel Haswell-EP support (core)
+  * add Applied Micro X-Gene processor support
+  * simplified X86 model detection for Intel processors
+  * Intel SNB, IVB, HSW event table updates
+  * IBM Power8 event table updates
+  * add ARM Cortex A53 support
+  * more bug fixes and minor updates
+
+ -- Stephane Eranian <eranian@gmail.com>  Tue, 30 Dec  2014 16:56:01 +0200
+
+libpfm4 (5.0) unstable; urgency=low
+  * Intel IVB-EP uncore PMU support
+  * Intel Silvermont support
+  * Perf raw event syntax support
+  * Intel RAPL event support
+  * AMD Fam15h northbridge support
+  * Qualcomm Krait support
+  * IBM Power 8 support
+  * IBM s390 updates
+  * AMD Fam15h fixes
+  * various IVB, SNB, HSW event table updates
+  * more bug fixes
+
+ -- Stephane Eranian <eranian@gmail.com>  Fri, 21 Feb  2014 18:45:01 +0200
+
 libpfm4 (4.0) unstable; urgency=low
   * Intel IVB-EP support
   * Intel IVB updates support
