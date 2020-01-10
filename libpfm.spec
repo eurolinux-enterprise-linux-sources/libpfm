@@ -10,7 +10,7 @@
 
 Name:		libpfm
 Version:	4.7.0
-Release:	10%{?dist}
+Release:	4%{?dist}
 
 Summary:	Library to encode performance events for use by perf tool
 
@@ -20,12 +20,6 @@ URL:		http://perfmon2.sourceforge.net/
 Source0:	http://sourceforge.net/projects/perfmon2/files/libpfm4/%{name}-%{version}.tar.gz
 Patch1: libpfm-updates.patch
 Patch2: libpfm-rhbz1440249.patch
-Patch3: libpfm-power9.patch
-Patch4: libpfm-bdx_unc.patch
-Patch5: libpfm-p9_alt.patch
-Patch6: libpfm-p9_uniq.patch
-Patch7: libpfm-intel_1port.patch
-Patch8: libpfm-s390.patch
 
 %if %{with python}
 BuildRequires:	python-devel
@@ -71,12 +65,6 @@ Python bindings for libpfm4 and perf_event_open system call.
 %setup -q
 %patch1 -p1
 %patch2 -p1
-%patch3 -p1
-%patch4 -p1
-%patch5 -p 1 -b .p9_alt
-%patch6 -p 1 -b .p9_uniq
-%patch7 -p 1 -b .1port
-%patch8 -p 1 -b .s390
 
 %build
 %if %{with python}
@@ -124,24 +112,6 @@ make \
 %endif
 
 %changelog
-* Mon Apr 16 2018 William Cohen <wcohen@redhat.com> - 4.7.0-10
-- Add support for z13/z13s. rhbz1548505
-
-* Tue Dec 5 2017 William Cohen <wcohen@redhat.com> - 4.7.0-9
-- Correct x86 unit mask naming. rhbz1521076
-
-* Mon Dec 4 2017 William Cohen <wcohen@redhat.com> - 4.7.0-8
-- Update IBM Power 9 events. rhbz1510684
-
-* Wed Nov 29 2017 William Cohen <wcohen@redhat.com> - 4.7.0-7
-- Update IBM Power 9 events. rhbz1510684
-
-* Mon Sep 25 2017 William Cohen <wcohen@redhat.com> - 4.7.0-6
-- Add access to Broadwell Uncore Counters. rhbz1474999
-
-* Tue Jun 20 2017 William Cohen <wcohen@redhat.com> - 4.7.0-5
-- Add IBM Power9 support.
-
 * Wed Apr 12 2017 William Cohen <wcohen@redhat.com> - 4.7.0-4
 - Correct handling of raw offcore umask handling. rhbz1440249
 
