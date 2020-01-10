@@ -1,0 +1,23 @@
+commit 2e98642dd331b15382256caa380834d01b63bef8
+Author: Stephane Eranian <eranian@gmail.com>
+Date:   Thu Oct 19 11:23:44 2017 -0700
+
+    Fix Intel Skylake EXE_ACTIVITY.1_PORTS_UTIL event
+    
+    Was missing a umask name.
+    
+    Signed-off-by: Stephane Eranian <eranian@gmail.com>
+
+diff --git a/lib/events/intel_skl_events.h b/lib/events/intel_skl_events.h
+index 8021403..38d2aa5 100644
+--- a/lib/events/intel_skl_events.h
++++ b/lib/events/intel_skl_events.h
+@@ -1973,7 +1973,7 @@ static const intel_x86_umask_t skl_fp_arith[]={
+ };
+ 
+ static const intel_x86_umask_t skl_exe_activity[]={
+-   { .uname  = "",
++   { .uname  = "1_PORTS_UTIL",
+      .udesc  = "Cycles with 1 uop executing across all ports and Reservation Station is not empty",
+      .ucode = 0x0200,
+      .uflags= INTEL_X86_NCOMBO,

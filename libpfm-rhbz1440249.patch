@@ -1,0 +1,1421 @@
+From b9709a7866498a84dc4ab60fb006631569bedbf0 Mon Sep 17 00:00:00 2001
+From: Stephane Eranian <eranian@gmail.com>
+Date: Mon, 3 Apr 2017 22:48:31 -0700
+Subject: [PATCH 1/7] Revert "fix struct validation for pfm_event_attr_info_t"
+
+This reverts commit 06b296c72838be44d8950dc03227fe0dc8ca1fb1.
+
+Break ABI compatibility from 4.7 to 4.8.
+
+Signed-off-by: Stephane Eranian <eranian@gmail.com>
+---
+ include/perfmon/pfmlib.h | 5 ++---
+ tests/validate.c         | 3 +--
+ 2 files changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/include/perfmon/pfmlib.h b/include/perfmon/pfmlib.h
+index 0e370ba50318..d9be4453accf 100644
+--- a/include/perfmon/pfmlib.h
++++ b/include/perfmon/pfmlib.h
+@@ -490,7 +490,6 @@ typedef struct {
+ 	size_t			size;	/* struct sizeof */
+ 	uint64_t		code;	/* attribute code */
+ 	pfm_attr_t		type;	/* attribute type */
+-	int			pad;	/* padding */
+ 	uint64_t		idx;	/* attribute opaque index */
+ 	pfm_attr_ctrl_t		ctrl;	/* what is providing attr */
+ 	struct {
+@@ -520,13 +519,13 @@ typedef struct {
+ #if __WORDSIZE == 64
+ #define PFM_PMU_INFO_ABI0	56
+ #define PFM_EVENT_INFO_ABI0	64
+-#define PFM_ATTR_INFO_ABI0	72
++#define PFM_ATTR_INFO_ABI0	64
+ 
+ #define PFM_RAW_ENCODE_ABI0	32
+ #else
+ #define PFM_PMU_INFO_ABI0	44
+ #define PFM_EVENT_INFO_ABI0	48
+-#define PFM_ATTR_INFO_ABI0	56
++#define PFM_ATTR_INFO_ABI0	48
+ 
+ #define PFM_RAW_ENCODE_ABI0	20
+ #endif
+diff --git a/tests/validate.c b/tests/validate.c
+index 0da0adc4995a..522a6ab7140d 100644
+--- a/tests/validate.c
++++ b/tests/validate.c
+@@ -201,7 +201,6 @@ static const struct_desc_t pfmlib_structs[]={
+ 		FIELD(code, pfm_event_attr_info_t),
+ 		FIELD(type, pfm_event_attr_info_t),
+ 		FIELD(idx, pfm_event_attr_info_t),
+-		FIELD(pad, pfm_event_attr_info_t), /* padding */
+ 		FIELD(ctrl, pfm_event_attr_info_t),
+ 		LAST_FIELD
+ 	 },
+@@ -271,7 +270,7 @@ validate_structs(void)
+ 		}
+ 
+ 		if (sz != d->sz) {
+-			printf("Failed (invisible padding of %zu bytes, total struct size %zu bytes)\n", d->sz - sz, d->sz);
++			printf("Failed (invisible padding of %zu bytes)\n", d->sz - sz);
+ 			errors++;
+ 			continue;
+ 		}
+-- 
+2.7.4
+
+From 01c24ef2c781c614544eeb5ce3922313118e3053 Mon Sep 17 00:00:00 2001
+From: Stephane Eranian <eranian@gmail.com>
+Date: Mon, 3 Apr 2017 22:49:18 -0700
+Subject: [PATCH 2/7] Revert "Fix pfmlib_parse_event_attr() parsing of raw
+ umask for 32-bit"
+
+This reverts commit bfb9baf1c8a9533fde271d0436ecd465934dfa17.
+
+support for 32-bit umask as implemented breaks ABI between 4.7 and 4.8.
+
+Signed-off-by: Stephane Eranian <eranian@gmail.com>
+---
+ lib/pfmlib_common.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/lib/pfmlib_common.c b/lib/pfmlib_common.c
+index cff4d2ecbd2c..c88e2aaae274 100644
+--- a/lib/pfmlib_common.c
++++ b/lib/pfmlib_common.c
+@@ -1011,10 +1011,10 @@ pfmlib_parse_event_attr(char *str, pfmlib_event_desc_t *d)
+ 			ainfo->name = "RAW_UMASK";
+ 			ainfo->type = PFM_ATTR_RAW_UMASK;
+ 			ainfo->ctrl = PFM_ATTR_CTRL_PMU;
+-			ainfo->idx  = strtoull(s, &endptr, 0);
++			ainfo->idx  = strtoul(s, &endptr, 0);
+ 			ainfo->equiv= NULL;
+ 			if (*endptr) {
+-				DPRINT("raw umask (%s) is not a number\n", s);
++				DPRINT("raw umask (%s) is not a number\n");
+ 				return PFM_ERR_ATTR;
+ 			}
+ 
+@@ -1368,9 +1368,9 @@ pfmlib_parse_event(const char *event, pfmlib_event_desc_t *d)
+ 	for (i = 0; i < d->nattrs; i++) {
+ 		pfm_event_attr_info_t *a = attr(d, i);
+ 		if (a->type != PFM_ATTR_RAW_UMASK)
+-			DPRINT("%d %d %"PRIu64" %s\n", d->event, i, a->idx, d->pattrs[d->attrs[i].id].name);
++			DPRINT("%d %d %d %s\n", d->event, i, a->idx, d->pattrs[d->attrs[i].id].name);
+ 		else
+-			DPRINT("%d %d RAW_UMASK (0x%"PRIx64")\n", d->event, i, a->idx);
++			DPRINT("%d %d RAW_UMASK (0x%x)\n", d->event, i, a->idx);
+ 	}
+ error:
+ 	free(str);
+-- 
+2.7.4
+
+From e206315c36e39409b7fc1e4cdd72caa5040b45c4 Mon Sep 17 00:00:00 2001
+From: Stephane Eranian <eranian@gmail.com>
+Date: Mon, 3 Apr 2017 22:52:22 -0700
+Subject: [PATCH 3/7] Revert "Allow raw umask for OFFCORE_RESPONSE on Intel
+ core PMUs"
+
+This reverts commit 4dc4c6ada254f30eee8cd2ae27bb0869a111b613.
+
+32-bit raw umask support break ABI between 4.7 and 4.8, so remove
+for now.
+
+Signed-off-by: Stephane Eranian <eranian@gmail.com>
+---
+ include/perfmon/pfmlib.h |   4 +-
+ lib/pfmlib_intel_x86.c   |  16 ++--
+ tests/validate_x86.c     | 232 -----------------------------------------------
+ 3 files changed, 9 insertions(+), 243 deletions(-)
+
+diff --git a/include/perfmon/pfmlib.h b/include/perfmon/pfmlib.h
+index d9be4453accf..6904c1c79b68 100644
+--- a/include/perfmon/pfmlib.h
++++ b/include/perfmon/pfmlib.h
+@@ -490,8 +490,8 @@ typedef struct {
+ 	size_t			size;	/* struct sizeof */
+ 	uint64_t		code;	/* attribute code */
+ 	pfm_attr_t		type;	/* attribute type */
+-	uint64_t		idx;	/* attribute opaque index */
+-	pfm_attr_ctrl_t		ctrl;	/* what is providing attr */
++	int			idx;	/* attribute opaque index */
++	pfm_attr_ctrl_t		ctrl;		/* what is providing attr */
+ 	struct {
+ 		unsigned int    is_dfl:1;	/* is default umask */
+ 		unsigned int    is_precise:1;	/* Intel X86: supports PEBS */
+diff --git a/lib/pfmlib_intel_x86.c b/lib/pfmlib_intel_x86.c
+index b698144f1da4..497cf1b9246a 100644
+--- a/lib/pfmlib_intel_x86.c
++++ b/lib/pfmlib_intel_x86.c
+@@ -481,18 +481,16 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
+ 				reg.sel_event_select = last_ucode;
+ 			}
+ 		} else if (a->type == PFM_ATTR_RAW_UMASK) {
+-			uint64_t rmask;
++
+ 			/* there can only be one RAW_UMASK per event */
+-			if (intel_x86_eflag(this, e->event, INTEL_X86_NHM_OFFCORE)) {
+-				rmask = (1ULL << 38) - 1;
+-			} else {
+-				rmask = 0xff;
+-			}
+-			if (a->idx & ~rmask) {
+-				DPRINT("raw umask is too wide\n");
++
++			/* sanity check */
++			if (a->idx & ~0xff) {
++				DPRINT("raw umask is 8-bit wide\n");
+ 				return PFM_ERR_ATTR;
+ 			}
+-			umask2  = a->idx & rmask;
++			/* override umask */
++			umask2 = a->idx & 0xff;
+ 			ugrpmsk = grpmsk;
+ 		} else {
+ 			uint64_t ival = e->attrs[k].ival;
+diff --git a/tests/validate_x86.c b/tests/validate_x86.c
+index 790ba585d8e7..906afba636e1 100644
+--- a/tests/validate_x86.c
++++ b/tests/validate_x86.c
+@@ -4057,238 +4057,6 @@ static const test_event_t x86_test_events[]={
+ 	  .fstr = "hsw::CYCLE_ACTIVITY:CYCLES_L2_PENDING:k=1:u=1:e=0:i=0:c=1:t=0:intx=0:intxcp=0",
+ 	},
+ 	{ SRC_LINE,
+-	  .name = "wsm::offcore_response_0:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xf,
+-	  .fstr = "wsm::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "wsm::offcore_response_0:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "wsm::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "wsm::offcore_response_0:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "snb::offcore_response_0:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xf,
+-	  .fstr = "snb::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "snb::offcore_response_0:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "snb::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "snb::offcore_response_0:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "ivb_ep::offcore_response_0:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xf,
+-	  .fstr = "ivb_ep::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "ivb_ep::offcore_response_0:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "ivb_ep::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "ivb_ep::offcore_response_0:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "hsw::offcore_response_0:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xf,
+-	  .fstr = "hsw::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "hsw::offcore_response_0:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "hsw::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "hsw::offcore_response_0:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "bdw_ep::offcore_response_0:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xf,
+-	  .fstr = "bdw_ep::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "bdw_ep::offcore_response_0:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "bdw_ep::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "bdw_ep::offcore_response_0:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "skl::offcore_response_0:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xf,
+-	  .fstr = "skl::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "skl::offcore_response_0:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301b7,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "skl::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "skl::offcore_response_0:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "wsm::offcore_response_1:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "wsm::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "wsm::offcore_response_1:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "snb::offcore_response_1:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xf,
+-	  .fstr = "snb::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "snb::offcore_response_1:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "snb::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "snb::offcore_response_1:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "ivb_ep::offcore_response_1:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xf,
+-	  .fstr = "ivb_ep::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "ivb_ep::offcore_response_1:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "ivb_ep::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "ivb_ep::offcore_response_1:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "hsw::offcore_response_1:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xf,
+-	  .fstr = "hsw::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "hsw::offcore_response_1:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "hsw::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "hsw::offcore_response_1:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "bdw_ep::offcore_response_1:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xf,
+-	  .fstr = "bdw_ep::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "bdw_ep::offcore_response_1:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "bdw_ep::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "bdw_ep::offcore_response_1:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+-	  .name = "skl::offcore_response_1:0xf",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xf,
+-	  .fstr = "skl::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "skl::offcore_response_1:0xfffffffff",
+-	  .ret  = PFM_SUCCESS,
+-	  .count = 2,
+-	  .codes[0] = 0x5301bb,
+-	  .codes[1] = 0xfffffffffull,
+-	  .fstr = "skl::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
+-	},
+-	{ SRC_LINE,
+-	  .name = "skl::offcore_response_1:0x7fffffffff",
+-	  .ret  = PFM_ERR_ATTR,
+-	},
+-	{ SRC_LINE,
+ 	  .name = "glm::offcore_response_1:any_request",
+ 	  .ret  = PFM_SUCCESS,
+ 	  .count = 2,
+-- 
+2.7.4
+
+From 1e01aa2112461ecb67ddc58750316cadd19a8612 Mon Sep 17 00:00:00 2001
+From: Stephane Eranian <eranian@gmail.com>
+Date: Mon, 3 Apr 2017 22:55:16 -0700
+Subject: [PATCH 4/7] improve error message in validate.c
+
+Add more detailed info in czase of size mismatch.
+
+Signed-off-by: Stephane Eranian <eranian@gmail.com>
+---
+ tests/validate.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/validate.c b/tests/validate.c
+index 522a6ab7140d..e4a8025f3f14 100644
+--- a/tests/validate.c
++++ b/tests/validate.c
+@@ -270,7 +270,7 @@ validate_structs(void)
+ 		}
+ 
+ 		if (sz != d->sz) {
+-			printf("Failed (invisible padding of %zu bytes)\n", d->sz - sz);
++			printf("Failed (invisible padding of %zu bytes, total struct size %zu bytes)\n", d->sz - sz, d->sz);
+ 			errors++;
+ 			continue;
+ 		}
+-- 
+2.7.4
+
+From 321133e1486084ea2b1494bc67b38ee085b31f71 Mon Sep 17 00:00:00 2001
+From: Stephane Eranian <eranian@gmail.com>
+Date: Mon, 3 Apr 2017 23:32:50 -0700
+Subject: [PATCH 5/7] create internal type for perf_event_attr_info_t
+
+This patch creates an internal version of the ABI
+pfm_event_attr_info structure called pfmlib_event_attr_info_t.
+The advantage is that we can change the internal version without
+ABI changes. The new struct is just a clone of the external version.
+But it can be customized for internal needs.
+
+The pfm_get_event_attr_info() converts the internal version into
+the external version.
+
+This patch changes internal interface to use pfmlib_event_attr_info_t
+for all architectures.
+
+Signed-off-by: Stephane Eranian <eranian@gmail.com>
+---
+ lib/pfmlib_amd64.c                |  4 ++--
+ lib/pfmlib_amd64_priv.h           |  2 +-
+ lib/pfmlib_arm.c                  |  4 ++--
+ lib/pfmlib_arm_priv.h             |  2 +-
+ lib/pfmlib_common.c               | 32 ++++++++++++++++++++------------
+ lib/pfmlib_intel_netburst.c       |  4 ++--
+ lib/pfmlib_intel_nhm_unc.c        |  2 +-
+ lib/pfmlib_intel_snbep_unc.c      |  4 ++--
+ lib/pfmlib_intel_snbep_unc_priv.h |  2 +-
+ lib/pfmlib_intel_x86.c            | 10 +++++-----
+ lib/pfmlib_intel_x86_perf_event.c |  6 +++---
+ lib/pfmlib_intel_x86_priv.h       |  2 +-
+ lib/pfmlib_mips.c                 |  4 ++--
+ lib/pfmlib_mips_priv.h            |  2 +-
+ lib/pfmlib_perf_event.c           |  4 ++--
+ lib/pfmlib_perf_event_pmu.c       |  6 +++---
+ lib/pfmlib_perf_event_raw.c       |  2 +-
+ lib/pfmlib_power_priv.h           |  2 +-
+ lib/pfmlib_powerpc.c              |  2 +-
+ lib/pfmlib_priv.h                 | 26 ++++++++++++++++++++++++--
+ lib/pfmlib_sparc.c                |  4 ++--
+ lib/pfmlib_sparc_priv.h           |  2 +-
+ lib/pfmlib_torrent.c              |  2 +-
+ 23 files changed, 80 insertions(+), 50 deletions(-)
+
+diff --git a/lib/pfmlib_amd64.c b/lib/pfmlib_amd64.c
+index 13838040b55a..be2a4ef86faf 100644
+--- a/lib/pfmlib_amd64.c
++++ b/lib/pfmlib_amd64.c
+@@ -426,7 +426,7 @@ pfm_amd64_get_encoding(void *this, pfmlib_event_desc_t *e)
+ {
+ 	const amd64_entry_t *pe = this_pe(this);
+ 	pfm_amd64_reg_t reg;
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	uint64_t umask = 0;
+ 	unsigned int plmmsk = 0;
+ 	int k, ret, grpid;
+@@ -661,7 +661,7 @@ pfm_amd64_event_is_valid(void *this, int pidx)
+ }
+ 
+ int
+-pfm_amd64_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_amd64_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	const amd64_entry_t *pe = this_pe(this);
+ 	int numasks, idx;
+diff --git a/lib/pfmlib_amd64_priv.h b/lib/pfmlib_amd64_priv.h
+index 66ca49ef1b1d..c3caae514f52 100644
+--- a/lib/pfmlib_amd64_priv.h
++++ b/lib/pfmlib_amd64_priv.h
+@@ -202,7 +202,7 @@ extern int pfm_amd64_get_encoding(void *this, pfmlib_event_desc_t *e);
+ extern int pfm_amd64_get_event_first(void *this);
+ extern int pfm_amd64_get_event_next(void *this, int idx);
+ extern int pfm_amd64_event_is_valid(void *this, int idx);
+-extern int pfm_amd64_get_event_attr_info(void *this, int idx, int attr_idx, pfm_event_attr_info_t *info);
++extern int pfm_amd64_get_event_attr_info(void *this, int idx, int attr_idx, pfmlib_event_attr_info_t *info);
+ extern int pfm_amd64_get_event_info(void *this, int idx, pfm_event_info_t *info);
+ extern int pfm_amd64_validate_table(void *this, FILE *fp);
+ extern int pfm_amd64_detect(void *this);
+diff --git a/lib/pfmlib_arm.c b/lib/pfmlib_arm.c
+index a49ca4504644..91c35c670ebe 100644
+--- a/lib/pfmlib_arm.c
++++ b/lib/pfmlib_arm.c
+@@ -180,7 +180,7 @@ pfm_arm_get_encoding(void *this, pfmlib_event_desc_t *e)
+ {
+ 
+ 	const arm_entry_t *pe = this_pe(this);
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	pfm_arm_reg_t reg;
+ 	unsigned int plm = 0;
+ 	int i, idx, has_plm = 0;
+@@ -305,7 +305,7 @@ pfm_arm_validate_table(void *this, FILE *fp)
+ }
+ 
+ int
+-pfm_arm_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_arm_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	int idx;
+ 
+diff --git a/lib/pfmlib_arm_priv.h b/lib/pfmlib_arm_priv.h
+index 81a9df9afdc7..4fc2e74955e4 100644
+--- a/lib/pfmlib_arm_priv.h
++++ b/lib/pfmlib_arm_priv.h
+@@ -66,7 +66,7 @@ extern int pfm_arm_get_event_first(void *this);
+ extern int pfm_arm_get_event_next(void *this, int idx);
+ extern int pfm_arm_event_is_valid(void *this, int pidx);
+ extern int pfm_arm_validate_table(void *this, FILE *fp);
+-extern int pfm_arm_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info);
++extern int pfm_arm_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info);
+ extern int pfm_arm_get_event_info(void *this, int idx, pfm_event_info_t *info);
+ extern unsigned int pfm_arm_get_event_nattrs(void *this, int pidx);
+ 
+diff --git a/lib/pfmlib_common.c b/lib/pfmlib_common.c
+index c88e2aaae274..f3c6dfa23e55 100644
+--- a/lib/pfmlib_common.c
++++ b/lib/pfmlib_common.c
+@@ -504,7 +504,7 @@ pfmlib_compact_attrs(pfmlib_event_desc_t *e, int i)
+ static inline int
+ pfmlib_same_attr(pfmlib_event_desc_t *d, int i, int j)
+ {
+-	pfm_event_attr_info_t *a1, *a2;
++	pfmlib_event_attr_info_t *a1, *a2;
+ 	pfmlib_attr_t *b1, *b2;
+ 
+ 	a1 = attr(d, i);
+@@ -967,7 +967,7 @@ pfmlib_sanitize_event(pfmlib_event_desc_t *d)
+ static int
+ pfmlib_parse_event_attr(char *str, pfmlib_event_desc_t *d)
+ {
+-	pfm_event_attr_info_t *ainfo;
++	pfmlib_event_attr_info_t *ainfo;
+ 	char *s, *p, *q, *endptr;
+ 	char yes[2] = "y";
+ 	pfm_attr_t type;
+@@ -1366,7 +1366,7 @@ pfmlib_parse_event(const char *event, pfmlib_event_desc_t *d)
+ 		ret = pfmlib_sanitize_event(d);
+ 
+ 	for (i = 0; i < d->nattrs; i++) {
+-		pfm_event_attr_info_t *a = attr(d, i);
++		pfmlib_event_attr_info_t *a = attr(d, i);
+ 		if (a->type != PFM_ATTR_RAW_UMASK)
+ 			DPRINT("%d %d %d %s\n", d->event, i, a->idx, d->pattrs[d->attrs[i].id].name);
+ 		else
+@@ -1549,7 +1549,7 @@ static int
+ pfmlib_pmu_validate_encoding(pfmlib_pmu_t *pmu, FILE *fp)
+ {
+ 	pfm_event_info_t einfo;
+-	pfm_event_attr_info_t ainfo;
++	pfmlib_event_attr_info_t ainfo;
+ 	char *buf;
+ 	size_t maxlen = 0, len;
+ 	int i, u, n = 0, um;
+@@ -1811,7 +1811,7 @@ pfm_get_event_info(int idx, pfm_os_t os, pfm_event_info_t *uinfo)
+ int
+ pfm_get_event_attr_info(int idx, int attr_idx, pfm_os_t os, pfm_event_attr_info_t *uinfo)
+ {
+-	pfm_event_attr_info_t info;
++	pfmlib_event_attr_info_t info;
+ 	pfmlib_event_desc_t e;
+ 	pfmlib_pmu_t *pmu;
+ 	size_t sz = sizeof(info);
+@@ -1857,17 +1857,25 @@ pfm_get_event_attr_info(int idx, int attr_idx, pfm_os_t os, pfm_event_attr_info_
+ 	info = e.pattrs[attr_idx];
+ 
+ 	/*
+-	 * rewrite size to reflect what we are returning
+-	 */
+-	info.size = sz;
+-	/*
+ 	 * info.idx = private, namespace specific index,
+ 	 * should not be visible externally, so override
+ 	 * with public index
++	 *
++	 * cannot memcpy() info into uinfo as they do not
++	 * have the same size, cf. idx field (uint64 vs, uint32)
+ 	 */
+-	info.idx  = attr_idx;
+-
+-	memcpy(uinfo, &info, sz);
++	uinfo->name  = info.name;
++	uinfo->desc  = info.desc;
++	uinfo->equiv = info.equiv;
++	uinfo->size  = sz;
++	uinfo->code  = info.code;
++	uinfo->type  = info.type;
++	uinfo->idx   = attr_idx;
++	uinfo->ctrl  = info.ctrl;
++	uinfo->is_dfl= info.is_dfl;
++	uinfo->is_precise = info.is_precise;
++	uinfo->reserved_bits = 0;
++	uinfo->dfl_val64 = info.dfl_val64;
+ 
+ 	ret = PFM_SUCCESS;
+ error:
+diff --git a/lib/pfmlib_intel_netburst.c b/lib/pfmlib_intel_netburst.c
+index 9d8f22b7705d..9b4960583523 100644
+--- a/lib/pfmlib_intel_netburst.c
++++ b/lib/pfmlib_intel_netburst.c
+@@ -110,7 +110,7 @@ netburst_add_defaults(pfmlib_event_desc_t *e, unsigned int *evmask)
+ int
+ pfm_netburst_get_encoding(void *this, pfmlib_event_desc_t *e)
+ {
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	netburst_escr_value_t escr;
+ 	netburst_cccr_value_t cccr;
+ 	unsigned int evmask = 0;
+@@ -322,7 +322,7 @@ pfm_netburst_event_is_valid(void *this, int pidx)
+ }
+ 
+ static int
+-pfm_netburst_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_netburst_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	const netburst_entry_t *pe = this_pe(this);
+ 	int numasks, idx;
+diff --git a/lib/pfmlib_intel_nhm_unc.c b/lib/pfmlib_intel_nhm_unc.c
+index 4c27b070f2d6..6731f4045332 100644
+--- a/lib/pfmlib_intel_nhm_unc.c
++++ b/lib/pfmlib_intel_nhm_unc.c
+@@ -82,7 +82,7 @@ static int
+ pfm_nhm_unc_get_encoding(void *this, pfmlib_event_desc_t *e)
+ {
+ 	pfm_intel_x86_reg_t reg;
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	const intel_x86_entry_t *pe = this_pe(this);
+ 	unsigned int grpmsk, ugrpmsk = 0;
+ 	int umodmsk = 0, modmsk_r = 0;
+diff --git a/lib/pfmlib_intel_snbep_unc.c b/lib/pfmlib_intel_snbep_unc.c
+index 075ae33b3a57..1e80147fc1a3 100644
+--- a/lib/pfmlib_intel_snbep_unc.c
++++ b/lib/pfmlib_intel_snbep_unc.c
+@@ -281,7 +281,7 @@ pfm_intel_snbep_unc_get_encoding(void *this, pfmlib_event_desc_t *e)
+ 	pfm_snbep_unc_reg_t reg;
+ 	pfm_snbep_unc_reg_t filters[INTEL_X86_MAX_FILTERS];
+ 	pfm_snbep_unc_reg_t addr;
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	uint64_t val, umask1, umask2;
+ 	int k, ret;
+ 	int has_cbo_tid = 0;
+@@ -641,7 +641,7 @@ pfm_intel_snbep_unc_can_auto_encode(void *this, int pidx, int uidx)
+ }
+ 
+ int
+-pfm_intel_snbep_unc_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_intel_snbep_unc_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	const intel_x86_entry_t *pe = this_pe(this);
+ 	const pfmlib_attr_desc_t *atdesc = this_atdesc(this);
+diff --git a/lib/pfmlib_intel_snbep_unc_priv.h b/lib/pfmlib_intel_snbep_unc_priv.h
+index 500ff84cc123..4984242c35bb 100644
+--- a/lib/pfmlib_intel_snbep_unc_priv.h
++++ b/lib/pfmlib_intel_snbep_unc_priv.h
+@@ -329,7 +329,7 @@ extern int  pfm_intel_hswep_unc_detect(void *this);
+ extern int  pfm_intel_knl_unc_detect(void *this);
+ extern int  pfm_intel_snbep_unc_get_perf_encoding(void *this, pfmlib_event_desc_t *e);
+ extern int  pfm_intel_snbep_unc_can_auto_encode(void *this, int pidx, int uidx);
+-extern int pfm_intel_snbep_unc_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info);
++extern int pfm_intel_snbep_unc_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info);
+ 
+ static inline int
+ is_cbo_filt_event(void *this, pfm_intel_x86_reg_t reg)
+diff --git a/lib/pfmlib_intel_x86.c b/lib/pfmlib_intel_x86.c
+index 497cf1b9246a..09a0f50a3a4e 100644
+--- a/lib/pfmlib_intel_x86.c
++++ b/lib/pfmlib_intel_x86.c
+@@ -296,7 +296,7 @@ static int
+ intel_x86_check_pebs(void *this, pfmlib_event_desc_t *e)
+ {
+ 	const intel_x86_entry_t *pe = this_pe(this);
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	int numasks = 0, pebs = 0;
+ 	int i;
+ 
+@@ -340,7 +340,7 @@ static int
+ intel_x86_check_max_grpid(void *this, pfmlib_event_desc_t *e, int max_grpid)
+ {
+ 	const intel_x86_entry_t *pe;
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	int i, grpid;
+ 
+ 	DPRINT("check: max_grpid=%d\n", max_grpid);
+@@ -366,7 +366,7 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
+ 
+ {
+ 	pfmlib_pmu_t *pmu = this;
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	const intel_x86_entry_t *pe;
+ 	pfm_intel_x86_reg_t reg, reg2;
+ 	unsigned int grpmsk, ugrpmsk = 0;
+@@ -964,7 +964,7 @@ pfm_intel_x86_validate_table(void *this, FILE *fp)
+ }
+ 
+ int
+-pfm_intel_x86_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_intel_x86_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	const intel_x86_entry_t *pe = this_pe(this);
+ 	const pfmlib_attr_desc_t *atdesc = this_atdesc(this);
+@@ -1029,7 +1029,7 @@ pfm_intel_x86_get_event_info(void *this, int idx, pfm_event_info_t *info)
+ int
+ pfm_intel_x86_valid_pebs(pfmlib_event_desc_t *e)
+ {
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	int i, npebs = 0, numasks = 0;
+ 
+ 	/* first check at the event level */
+diff --git a/lib/pfmlib_intel_x86_perf_event.c b/lib/pfmlib_intel_x86_perf_event.c
+index f346d4f92be5..0735ef9d88c1 100644
+--- a/lib/pfmlib_intel_x86_perf_event.c
++++ b/lib/pfmlib_intel_x86_perf_event.c
+@@ -60,7 +60,7 @@ find_pmu_type_by_name(const char *name)
+ static int
+ has_ldlat(void *this, pfmlib_event_desc_t *e)
+ {
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	int i;
+ 
+ 	for (i = 0; i < e->nattrs; i++) {
+@@ -217,7 +217,7 @@ pfm_intel_nhm_unc_get_perf_encoding(void *this, pfmlib_event_desc_t *e)
+ int
+ pfm_intel_x86_requesting_pebs(pfmlib_event_desc_t *e)
+ {
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	int i;
+ 
+ 	for (i = 0; i < e->nattrs; i++) {
+@@ -233,7 +233,7 @@ pfm_intel_x86_requesting_pebs(pfmlib_event_desc_t *e)
+ static int
+ intel_x86_event_has_pebs(void *this, pfmlib_event_desc_t *e)
+ {
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	int i;
+ 
+ 	/* first check at the event level */
+diff --git a/lib/pfmlib_intel_x86_priv.h b/lib/pfmlib_intel_x86_priv.h
+index 963b41a8a766..e2dfbf3d9b40 100644
+--- a/lib/pfmlib_intel_x86_priv.h
++++ b/lib/pfmlib_intel_x86_priv.h
+@@ -335,7 +335,7 @@ extern int pfm_intel_x86_get_event_next(void *this, int idx);
+ extern int pfm_intel_x86_get_event_umask_first(void *this, int idx);
+ extern int pfm_intel_x86_get_event_umask_next(void *this, int idx, int attr);
+ extern int pfm_intel_x86_validate_table(void *this, FILE *fp);
+-extern int pfm_intel_x86_get_event_attr_info(void *this, int idx, int attr_idx, pfm_event_attr_info_t *info);
++extern int pfm_intel_x86_get_event_attr_info(void *this, int idx, int attr_idx, pfmlib_event_attr_info_t *info);
+ extern int pfm_intel_x86_get_event_info(void *this, int idx, pfm_event_info_t *info);
+ extern int pfm_intel_x86_valid_pebs(pfmlib_event_desc_t *e);
+ extern int pfm_intel_x86_perf_event_encoding(pfmlib_event_desc_t *e, void *data);
+diff --git a/lib/pfmlib_mips.c b/lib/pfmlib_mips.c
+index 8357ea515045..61db613be433 100644
+--- a/lib/pfmlib_mips.c
++++ b/lib/pfmlib_mips.c
+@@ -174,7 +174,7 @@ pfm_mips_get_encoding(void *this, pfmlib_event_desc_t *e)
+ 
+ 	pfmlib_pmu_t *pmu = this;
+ 	const mips_entry_t *pe = this_pe(this);
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	pfm_mips_sel_reg_t reg;
+ 	uint64_t ival, cntmask = 0;
+ 	int plmmsk = 0, code;
+@@ -333,7 +333,7 @@ pfm_mips_get_event_nattrs(void *this, int pidx)
+ }
+ 
+ int
+-pfm_mips_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_mips_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	/* no umasks, so all attrs are modifiers */
+ 
+diff --git a/lib/pfmlib_mips_priv.h b/lib/pfmlib_mips_priv.h
+index c5112f510acf..1ed2bcba28c8 100644
+--- a/lib/pfmlib_mips_priv.h
++++ b/lib/pfmlib_mips_priv.h
+@@ -107,7 +107,7 @@ extern int pfm_mips_get_event_first(void *this);
+ extern int pfm_mips_get_event_next(void *this, int idx);
+ extern int pfm_mips_event_is_valid(void *this, int pidx);
+ extern int pfm_mips_validate_table(void *this, FILE *fp);
+-extern int pfm_mips_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info);
++extern int pfm_mips_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info);
+ extern int pfm_mips_get_event_info(void *this, int idx, pfm_event_info_t *info);
+ extern unsigned int pfm_mips_get_event_nattrs(void *this, int pidx);
+ 
+diff --git a/lib/pfmlib_perf_event.c b/lib/pfmlib_perf_event.c
+index 8618d6070968..df18821a540d 100644
+--- a/lib/pfmlib_perf_event.c
++++ b/lib/pfmlib_perf_event.c
+@@ -82,7 +82,7 @@ pfmlib_perf_event_encode(void *this, const char *str, int dfl_plm, void *data)
+ 	struct perf_event_attr my_attr, *attr;
+ 	pfmlib_pmu_t *pmu;
+ 	pfmlib_event_desc_t e;
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	size_t orig_sz, asz, sz = sizeof(arg);
+ 	uint64_t ival;
+ 	int has_plm = 0, has_vmx_plm = 0;
+@@ -357,7 +357,7 @@ static int
+ perf_get_os_attr_info(void *this, pfmlib_event_desc_t *e)
+ {
+ 	pfmlib_os_t *os = this;
+-	pfm_event_attr_info_t *info;
++	pfmlib_event_attr_info_t *info;
+ 	int i, k, j = e->npattrs;
+ 
+ 	for (i = k = 0; os->atdesc[i].name; i++) {
+diff --git a/lib/pfmlib_perf_event_pmu.c b/lib/pfmlib_perf_event_pmu.c
+index 5b2d8104696a..5c81552da71e 100644
+--- a/lib/pfmlib_perf_event_pmu.c
++++ b/lib/pfmlib_perf_event_pmu.c
+@@ -569,7 +569,7 @@ static int
+ pfmlib_perf_encode_tp(pfmlib_event_desc_t *e)
+ {
+ 	perf_umask_t *um;
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	int i, nu = 0;
+ 
+ 	e->fstr[0] = '\0';
+@@ -607,7 +607,7 @@ pfmlib_perf_encode_tp(pfmlib_event_desc_t *e)
+ static int
+ pfmlib_perf_encode_hw_cache(pfmlib_event_desc_t *e)
+ {
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	perf_event_t *ent;
+ 	unsigned int msk, grpmsk;
+ 	uint64_t umask = 0;
+@@ -733,7 +733,7 @@ pfm_perf_event_is_valid(void *this, int idx)
+ }
+ 
+ static int
+-pfm_perf_get_event_attr_info(void *this, int idx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_perf_get_event_attr_info(void *this, int idx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	perf_umask_t *um;
+ 
+diff --git a/lib/pfmlib_perf_event_raw.c b/lib/pfmlib_perf_event_raw.c
+index e10d215912ea..71d944334876 100644
+--- a/lib/pfmlib_perf_event_raw.c
++++ b/lib/pfmlib_perf_event_raw.c
+@@ -91,7 +91,7 @@ pfm_perf_raw_event_is_valid(void *this, int idx)
+ }
+ 
+ static int
+-pfm_perf_raw_get_event_attr_info(void *this, int idx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_perf_raw_get_event_attr_info(void *this, int idx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	return PFM_ERR_ATTR;
+ }
+diff --git a/lib/pfmlib_power_priv.h b/lib/pfmlib_power_priv.h
+index 8b5c3ac0ffcf..3b72d326e3bb 100644
+--- a/lib/pfmlib_power_priv.h
++++ b/lib/pfmlib_power_priv.h
+@@ -101,7 +101,7 @@ typedef struct {
+ #define POWER8_PLM (POWER_PLM|PFM_PLMH)
+ 
+ extern int pfm_gen_powerpc_get_event_info(void *this, int pidx, pfm_event_info_t *info);
+-extern int pfm_gen_powerpc_get_event_attr_info(void *this, int pidx, int umask_idx, pfm_event_attr_info_t *info);
++extern int pfm_gen_powerpc_get_event_attr_info(void *this, int pidx, int umask_idx, pfmlib_event_attr_info_t *info);
+ extern int pfm_gen_powerpc_get_encoding(void *this, pfmlib_event_desc_t *e);
+ extern int pfm_gen_powerpc_get_event_first(void *this);
+ extern int pfm_gen_powerpc_get_event_next(void *this, int idx);
+diff --git a/lib/pfmlib_powerpc.c b/lib/pfmlib_powerpc.c
+index f025dede599d..f32080d63b5e 100644
+--- a/lib/pfmlib_powerpc.c
++++ b/lib/pfmlib_powerpc.c
+@@ -56,7 +56,7 @@ pfm_gen_powerpc_get_event_info(void *this, int pidx, pfm_event_info_t *info)
+ }
+ 
+ int
+-pfm_gen_powerpc_get_event_attr_info(void *this, int pidx, int umask_idx, pfm_event_attr_info_t *info)
++pfm_gen_powerpc_get_event_attr_info(void *this, int pidx, int umask_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	/* No attributes are supported */
+ 	return PFM_ERR_ATTR;
+diff --git a/lib/pfmlib_priv.h b/lib/pfmlib_priv.h
+index 33d7fdf2013d..2f4d2b9d494b 100644
+--- a/lib/pfmlib_priv.h
++++ b/lib/pfmlib_priv.h
+@@ -56,6 +56,28 @@ typedef struct {
+ 	pfm_attr_t	type;	/* used to validate value (if any) */
+ } pfmlib_attr_desc_t;
+ 
++typedef struct {
++	const char		*name;	/* attribute symbolic name */
++	const char		*desc;	/* attribute description */
++	const char		*equiv;	/* attribute is equivalent to */
++	size_t			size;	/* struct sizeof */
++	uint64_t		code;	/* attribute code */
++	pfm_attr_t		type;	/* attribute type */
++	int			idx;	/* attribute opaque index */
++	pfm_attr_ctrl_t		ctrl;		/* what is providing attr */
++	struct {
++		unsigned int    is_dfl:1;	/* is default umask */
++		unsigned int    is_precise:1;	/* Intel X86: supports PEBS */
++		unsigned int	reserved_bits:30;
++	};
++	union {
++		uint64_t	dfl_val64;	/* default 64-bit value */
++		const char	*dfl_str;	/* default string value */
++		int		dfl_bool;	/* default boolean value */
++		int		dfl_int;	/* default integer value */
++	};
++} pfmlib_event_attr_info_t;
++
+ /*
+  * attribute description passed to model-specific layer
+  */
+@@ -90,7 +112,7 @@ typedef struct {
+ 	int			count;				/* number of entries in codes[] */
+ 	pfmlib_attr_t		attrs[PFMLIB_MAX_ATTRS];	/* list of requested attributes */
+ 
+-	pfm_event_attr_info_t	*pattrs;			/* list of possible attributes */
++	pfmlib_event_attr_info_t *pattrs;			/* list of possible attributes */
+ 	char			fstr[PFMLIB_EVT_MAX_NAME_LEN];	/* fully qualified event string */
+ 	uint64_t		codes[PFMLIB_MAX_ENCODING];	/* event encoding */
+ 	void			*os_data;
+@@ -129,7 +151,7 @@ typedef struct pfmlib_pmu {
+ 	int		 (*event_is_valid)(void *this, int pidx);
+ 	int		 (*can_auto_encode)(void *this, int pidx, int uidx);
+ 
+-	int		 (*get_event_attr_info)(void *this, int pidx, int umask_idx, pfm_event_attr_info_t *info);
++	int		 (*get_event_attr_info)(void *this, int pidx, int umask_idx, pfmlib_event_attr_info_t *info);
+ 	int		 (*get_event_encoding[PFM_OS_MAX])(void *this, pfmlib_event_desc_t *e);
+ 
+ 	void		 (*validate_pattrs[PFM_OS_MAX])(void *this, pfmlib_event_desc_t *e);
+diff --git a/lib/pfmlib_sparc.c b/lib/pfmlib_sparc.c
+index f88b5512a5f4..fe8da0618d31 100644
+--- a/lib/pfmlib_sparc.c
++++ b/lib/pfmlib_sparc.c
+@@ -165,7 +165,7 @@ int
+ pfm_sparc_get_encoding(void *this, pfmlib_event_desc_t *e)
+ {
+ 	const sparc_entry_t *pe = this_pe(this);
+-	pfm_event_attr_info_t *a;
++	pfmlib_event_attr_info_t *a;
+ 	pfm_sparc_reg_t reg;
+ 	int i;
+ 
+@@ -260,7 +260,7 @@ pfm_sparc_validate_table(void *this, FILE *fp)
+ }
+ 
+ int
+-pfm_sparc_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info)
++pfm_sparc_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info)
+ {
+ 	const sparc_entry_t *pe = this_pe(this);
+ 	int idx;
+diff --git a/lib/pfmlib_sparc_priv.h b/lib/pfmlib_sparc_priv.h
+index 7de9b3dc327a..332651ff051e 100644
+--- a/lib/pfmlib_sparc_priv.h
++++ b/lib/pfmlib_sparc_priv.h
+@@ -45,7 +45,7 @@ extern int pfm_sparc_get_event_first(void *this);
+ extern int pfm_sparc_get_event_next(void *this, int idx);
+ extern int pfm_sparc_event_is_valid(void *this, int pidx);
+ extern int pfm_sparc_validate_table(void *this, FILE *fp);
+-extern int pfm_sparc_get_event_attr_info(void *this, int pidx, int attr_idx, pfm_event_attr_info_t *info);
++extern int pfm_sparc_get_event_attr_info(void *this, int pidx, int attr_idx, pfmlib_event_attr_info_t *info);
+ extern int pfm_sparc_get_event_info(void *this, int idx, pfm_event_info_t *info);
+ extern unsigned int pfm_sparc_get_event_nattrs(void *this, int pidx);
+ 
+diff --git a/lib/pfmlib_torrent.c b/lib/pfmlib_torrent.c
+index b8d697aa27ac..72991e7ec98a 100644
+--- a/lib/pfmlib_torrent.c
++++ b/lib/pfmlib_torrent.c
+@@ -104,7 +104,7 @@ pfm_torrent_get_event_info(void *this, int pidx, pfm_event_info_t *info)
+ 
+ static int
+ pfm_torrent_get_event_attr_info(void *this, int idx, int attr_idx,
+-				  pfm_event_attr_info_t *info)
++				  pfmlib_event_attr_info_t *info)
+ {
+ 	int m;
+ 
+-- 
+2.7.4
+
+From 39d4b76fa96825ec65724eb94939a3b534a62fd0 Mon Sep 17 00:00:00 2001
+From: Stephane Eranian <eranian@gmail.com>
+Date: Mon, 3 Apr 2017 23:41:10 -0700
+Subject: [PATCH 6/7] enable generic support for 64-bit raw umask
+
+This patch modifies the generic code to handle 64-bit raw umasks
+passed by users.
+
+Signed-off-by: Stephane Eranian <eranian@gmail.com>
+---
+ lib/pfmlib_common.c | 3 ++-
+ lib/pfmlib_priv.h   | 4 ++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/lib/pfmlib_common.c b/lib/pfmlib_common.c
+index f3c6dfa23e55..6ff44994203b 100644
+--- a/lib/pfmlib_common.c
++++ b/lib/pfmlib_common.c
+@@ -1011,7 +1011,8 @@ pfmlib_parse_event_attr(char *str, pfmlib_event_desc_t *d)
+ 			ainfo->name = "RAW_UMASK";
+ 			ainfo->type = PFM_ATTR_RAW_UMASK;
+ 			ainfo->ctrl = PFM_ATTR_CTRL_PMU;
+-			ainfo->idx  = strtoul(s, &endptr, 0);
++			/* can handle up to 64-bit raw umask */
++			ainfo->idx  = strtoull(s, &endptr, 0);
+ 			ainfo->equiv= NULL;
+ 			if (*endptr) {
+ 				DPRINT("raw umask (%s) is not a number\n");
+diff --git a/lib/pfmlib_priv.h b/lib/pfmlib_priv.h
+index 2f4d2b9d494b..b7503a76de01 100644
+--- a/lib/pfmlib_priv.h
++++ b/lib/pfmlib_priv.h
+@@ -63,8 +63,8 @@ typedef struct {
+ 	size_t			size;	/* struct sizeof */
+ 	uint64_t		code;	/* attribute code */
+ 	pfm_attr_t		type;	/* attribute type */
+-	int			idx;	/* attribute opaque index */
+-	pfm_attr_ctrl_t		ctrl;		/* what is providing attr */
++	pfm_attr_ctrl_t		ctrl;	/* what is providing attr */
++	uint64_t		idx;	/* attribute opaque index */
+ 	struct {
+ 		unsigned int    is_dfl:1;	/* is default umask */
+ 		unsigned int    is_precise:1;	/* Intel X86: supports PEBS */
+-- 
+2.7.4
+
+From 088a1806676382e1a0324ba4c2d59b9d07a96caf Mon Sep 17 00:00:00 2001
+From: Stephane Eranian <eranian@gmail.com>
+Date: Tue, 4 Apr 2017 09:42:25 -0700
+Subject: [PATCH 7/7] enable 38-bit raw umask for Intel offcore_response event
+
+This patch enables support for passing and encoding of 38-bit
+offcore_response matrix umask. Without the patch, the raw umask
+was limited to 32-bit which is not enough to cover all the possible
+bits of the offcore_response event available since Intel SandyBridge.
+
+$ examples/check_events offcore_response_0:0xffffff
+Requested Event: offcore_response_0:0xffffff
+Actual    Event: ivb::OFFCORE_RESPONSE_0:0xffffff:k=1:u=1:e=0:i=0:c=0:t=0
+PMU            : Intel Ivy Bridge
+IDX            : 155189325
+Codes          : 0x5301b7 0xffffff
+
+The patch also adds tests to the validation code.
+
+Signed-off-by: Stephane Eranian <eranian@gmail.com>
+---
+ lib/pfmlib_intel_x86.c |  20 +++--
+ tests/validate_x86.c   | 232 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 246 insertions(+), 6 deletions(-)
+
+diff --git a/lib/pfmlib_intel_x86.c b/lib/pfmlib_intel_x86.c
+index 09a0f50a3a4e..8fe93115dfa9 100644
+--- a/lib/pfmlib_intel_x86.c
++++ b/lib/pfmlib_intel_x86.c
+@@ -481,16 +481,24 @@ pfm_intel_x86_encode_gen(void *this, pfmlib_event_desc_t *e)
+ 				reg.sel_event_select = last_ucode;
+ 			}
+ 		} else if (a->type == PFM_ATTR_RAW_UMASK) {
++			int ofr_bits = 8;
++			uint64_t rmask;
++
++			/* set limit on width of raw umask */
++			if (intel_x86_eflag(this, e->event, INTEL_X86_NHM_OFFCORE)) {
++				ofr_bits = 38;
++				if (e->pmu->pmu == PFM_PMU_INTEL_WSM || e->pmu->pmu == PFM_PMU_INTEL_WSM_DP)
++					ofr_bits = 16;
++			}
++			rmask = (1ULL << ofr_bits) - 1;
+ 
+-			/* there can only be one RAW_UMASK per event */
+-
+-			/* sanity check */
+-			if (a->idx & ~0xff) {
+-				DPRINT("raw umask is 8-bit wide\n");
++			if (a->idx & ~rmask) {
++				DPRINT("raw umask is too wide max %d bits\n", ofr_bits);
+ 				return PFM_ERR_ATTR;
+ 			}
++
+ 			/* override umask */
+-			umask2 = a->idx & 0xff;
++			umask2  = a->idx & rmask;
+ 			ugrpmsk = grpmsk;
+ 		} else {
+ 			uint64_t ival = e->attrs[k].ival;
+diff --git a/tests/validate_x86.c b/tests/validate_x86.c
+index 906afba636e1..aa0aaa114d0d 100644
+--- a/tests/validate_x86.c
++++ b/tests/validate_x86.c
+@@ -4523,6 +4523,238 @@ static const test_event_t x86_test_events[]={
+ 	  .codes[0] = 0x0825,
+ 	  .fstr = "knl_unc_m2pcie::UNC_M2P_EGRESS_CYCLES_FULL:AD_1",
+ 	},
++	{ SRC_LINE,
++	  .name = "wsm::offcore_response_0:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xf,
++	  .fstr = "wsm::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "wsm::offcore_response_0:0xffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xffff,
++	  .fstr = "wsm::OFFCORE_RESPONSE_0:0xffff:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "wsm::offcore_response_0:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "snb::offcore_response_0:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xf,
++	  .fstr = "snb::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "snb::offcore_response_0:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "snb::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "snb::offcore_response_0:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "ivb_ep::offcore_response_0:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xf,
++	  .fstr = "ivb_ep::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "ivb_ep::offcore_response_0:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "ivb_ep::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "ivb_ep::offcore_response_0:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "hsw::offcore_response_0:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xf,
++	  .fstr = "hsw::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "hsw::offcore_response_0:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "hsw::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "hsw::offcore_response_0:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "bdw_ep::offcore_response_0:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xf,
++	  .fstr = "bdw_ep::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "bdw_ep::offcore_response_0:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "bdw_ep::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "bdw_ep::offcore_response_0:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "skl::offcore_response_0:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xf,
++	  .fstr = "skl::OFFCORE_RESPONSE_0:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "skl::offcore_response_0:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301b7,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "skl::OFFCORE_RESPONSE_0:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "skl::offcore_response_0:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "wsm::offcore_response_1:0xfff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xfff,
++	  .fstr = "wsm::OFFCORE_RESPONSE_1:0xfff:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "wsm::offcore_response_1:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "snb::offcore_response_1:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xf,
++	  .fstr = "snb::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "snb::offcore_response_1:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "snb::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "snb::offcore_response_1:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "ivb_ep::offcore_response_1:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xf,
++	  .fstr = "ivb_ep::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "ivb_ep::offcore_response_1:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "ivb_ep::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0",
++	},
++	{ SRC_LINE,
++	  .name = "ivb_ep::offcore_response_1:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "hsw::offcore_response_1:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xf,
++	  .fstr = "hsw::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "hsw::offcore_response_1:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "hsw::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "hsw::offcore_response_1:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "bdw_ep::offcore_response_1:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xf,
++	  .fstr = "bdw_ep::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "bdw_ep::offcore_response_1:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "bdw_ep::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "bdw_ep::offcore_response_1:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
++	{ SRC_LINE,
++	  .name = "skl::offcore_response_1:0xf",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xf,
++	  .fstr = "skl::OFFCORE_RESPONSE_1:0xf:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "skl::offcore_response_1:0xfffffffff",
++	  .ret  = PFM_SUCCESS,
++	  .count = 2,
++	  .codes[0] = 0x5301bb,
++	  .codes[1] = 0xfffffffff,
++	  .fstr = "skl::OFFCORE_RESPONSE_1:0xffffffff:k=1:u=1:e=0:i=0:c=0:t=0:intx=0:intxcp=0",
++	},
++	{ SRC_LINE,
++	  .name = "skl::offcore_response_1:0x7fffffffff",
++	  .ret  = PFM_ERR_ATTR,
++	},
+ };
+ 
+ #define NUM_TEST_EVENTS (int)(sizeof(x86_test_events)/sizeof(test_event_t))
+-- 
+2.7.4
+
+From 1eac17750c99cc29156d3cf2815b4bf0cdf1a1be Mon Sep 17 00:00:00 2001
+From: William Cohen <wcohen@redhat.com>
+Date: Tue, 11 Apr 2017 11:22:59 -0400
+Subject: [PATCH] Also convert s390 to use the internal
+ pfmlib_event_attr_info_t
+
+Commit 321133e converted most of the architectures to use the internal
+perflib_event_attr_info_t type.  However, the s390 was missed in that
+previous commit.  This patch corrects the issue so libpfm compiles on
+s390.
+---
+ lib/pfmlib_s390x_cpumf.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/pfmlib_s390x_cpumf.c b/lib/pfmlib_s390x_cpumf.c
+index db2a215..b5444ef 100644
+--- a/lib/pfmlib_s390x_cpumf.c
++++ b/lib/pfmlib_s390x_cpumf.c
+@@ -254,7 +254,7 @@ static int pfm_cpumf_get_event_info(void *this, int idx,
+ }
+ 
+ static int pfm_cpumf_get_event_attr_info(void *this, int idx, int umask_idx,
+-					 pfm_event_attr_info_t *info)
++					 pfmlib_event_attr_info_t *info)
+ {
+ 	/* Attributes are not supported */
+ 	return PFM_ERR_ATTR;
+-- 
+2.9.3
+
